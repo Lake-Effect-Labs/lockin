@@ -125,31 +125,41 @@ export const useAuthStore = create<AuthState>()(
 
       // Sign in with email/password
       signIn: async (email: string, password: string) => {
+        set({ isLoading: true, error: null, authUser: null, user: null });
+        
         try {
-          set({ isLoading: true, error: null });
+          const result = await signInDB(email, password);
           
-          const { user: authUser } = await signInDB(email, password);
-          
-          if (authUser) {
-            // Profile should be auto-created by database trigger, but check anyway
-            let profile = await getProfile(authUser.id);
-            if (!profile) {
-              // Fallback: try to create manually (might fail due to RLS, but trigger should handle it)
-              try {
-                profile = await createProfile(authUser.id, email);
-              } catch (err: any) {
-                // If creation fails, wait a moment and try fetching again (trigger might be processing)
-                await new Promise(resolve => setTimeout(resolve, 500));
-                profile = await getProfile(authUser.id);
-              }
-            }
-            await registerForPushNotifications(authUser.id);
-            set({ authUser, user: profile, isLoading: false });
+          // Check if we actually got a user - if not, it's an error
+          if (!result?.user) {
+            throw new Error('Invalid email or password. Please try again.');
           }
+          
+          const authUser = result.user;
+          
+          // Profile should be auto-created by database trigger, but check anyway
+          let profile = await getProfile(authUser.id);
+          if (!profile) {
+            // Fallback: try to create manually (might fail due to RLS, but trigger should handle it)
+            try {
+              profile = await createProfile(authUser.id, email);
+            } catch (err: any) {
+              // If creation fails, wait a moment and try fetching again (trigger might be processing)
+              await new Promise(resolve => setTimeout(resolve, 500));
+              profile = await getProfile(authUser.id);
+            }
+          }
+          
+          await registerForPushNotifications(authUser.id);
+          set({ authUser, user: profile, isLoading: false, error: null });
         } catch (error: any) {
           console.error('Sign in error:', error);
-          set({ error: error.message, isLoading: false });
-          throw error;
+          const errorMessage = error.message?.includes('Invalid login credentials') || error.message?.includes('Invalid email or password')
+            ? 'Invalid email or password. Please try again.'
+            : error.message || 'Failed to sign in. Please try again.';
+          set({ error: errorMessage, isLoading: false, authUser: null, user: null });
+          // Throw error to prevent navigation
+          throw new Error(errorMessage);
         }
       },
 

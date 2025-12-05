@@ -6,8 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { LeagueCard, EmptyLeagueCard } from '@/components/LeagueCard';
 import { Avatar } from '@/components/Avatar';
 import { StatsGrid } from '@/components/StatBubble';
-import { SyncStatusIndicator } from '@/components/SyncStatusIndicator';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { colors } from '@/utils/colors';
 
 // ============================================
@@ -112,19 +112,25 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>This Week's Stats</Text>
-            <SyncStatusIndicator 
-              compact 
-              onPress={refresh}
-            />
           </View>
-          <View style={styles.statsCard}>
-            <StatsGrid stats={stats} columns={3} />
-            {lastSyncedAt && (
+          {lastSyncedAt ? (
+            <View style={styles.statsCard}>
+              <StatsGrid stats={stats} columns={3} />
               <Text style={styles.syncTime}>
                 Updated {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
-            )}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.emptyStatsCard}>
+              <Ionicons name="stats-chart-outline" size={48} color={colors.text.tertiary} />
+              <Text style={styles.emptyStatsTitle}>No Data Yet</Text>
+              <Text style={styles.emptyStatsText}>
+                {fakeMode 
+                  ? 'Fake data mode is active. Health data will sync automatically.'
+                  : 'Your fitness data will appear here once synced. Make sure HealthKit permissions are enabled.'}
+              </Text>
+            </View>
+          )}
         </View>
         
         {/* Leagues Section */}
@@ -136,15 +142,20 @@ export default function HomeScreen() {
           
           {leagues.length > 0 ? (
             <View style={styles.leaguesList}>
-              {leagues.map((league) => (
-                <LeagueCard
-                  key={league.id}
-                  league={league}
-                  members={league.members}
-                  userMember={league.userMember}
-                  onPress={() => router.push(`/(app)/league/${league.id}`)}
-                  style={styles.leagueCard}
-                />
+              {leagues.map((league, index) => (
+                <React.Fragment key={league.id}>
+                  <LeagueCard
+                    league={league}
+                    members={league.members}
+                    userMember={league.userMember}
+                    onPress={() => router.push(`/(app)/league/${league.id}`)}
+                    style={styles.leagueCard}
+                  />
+                  {/* Ad Banner - Middle of leagues list */}
+                  {index === Math.floor(leagues.length / 2) - 1 && (
+                    <SmartAdBanner placement="home" />
+                  )}
+                </React.Fragment>
               ))}
             </View>
           ) : (
@@ -173,28 +184,6 @@ export default function HomeScreen() {
           </View>
         </View>
         
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={refresh}
-            disabled={isSyncing}
-          >
-            <LinearGradient
-              colors={isSyncing ? [colors.background.card, colors.background.elevated] : colors.gradients.primary}
-              style={styles.quickActionGradient}
-            >
-              <Ionicons 
-                name={isSyncing ? "sync" : "sync-outline"} 
-                size={24} 
-                color={isSyncing ? colors.text.secondary : colors.text.primary} 
-              />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -320,6 +309,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     textAlign: 'center',
+  },
+  emptyStatsCard: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: colors.background.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  emptyStatsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStatsText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   actionCards: {
     flexDirection: 'row',

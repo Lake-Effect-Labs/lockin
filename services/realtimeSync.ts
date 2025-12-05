@@ -425,9 +425,15 @@ export function formatLastSyncTime(): string {
  */
 async function checkLeadChanges(userId: string, opponentData: any): Promise<void> {
   try {
-    const leagueId = opponentData.league_id;
-    const week = opponentData.week;
-    const opponentId = opponentData.user_id;
+    const leagueId = opponentData?.league_id;
+    const week = opponentData?.week;
+    const opponentId = opponentData?.user_id;
+    
+    // Validate required fields
+    if (!leagueId || !week || !opponentId) {
+      console.log('⚠️ Missing required fields in opponentData, skipping lead check');
+      return;
+    }
     
     // Get user's current score for this league/week
     const userScore = await getWeeklyScore(leagueId, userId, week);

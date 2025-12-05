@@ -15,6 +15,8 @@ interface MatchupCardProps {
   currentUserId: string;
   userScore?: WeeklyScore | null;
   opponentScore?: WeeklyScore | null;
+  calculatedMyScore?: number; // Use this if provided (current calculated score)
+  calculatedTheirScore?: number; // Use this if provided (current calculated score)
   onPress?: () => void;
   style?: ViewStyle;
   compact?: boolean;
@@ -25,6 +27,8 @@ export function MatchupCard({
   currentUserId,
   userScore,
   opponentScore,
+  calculatedMyScore,
+  calculatedTheirScore,
   onPress,
   style,
   compact = false,
@@ -32,8 +36,10 @@ export function MatchupCard({
   const isPlayer1 = matchup.player1_id === currentUserId;
   const user = isPlayer1 ? matchup.player1 : matchup.player2;
   const opponent = isPlayer1 ? matchup.player2 : matchup.player1;
-  const myScore = isPlayer1 ? matchup.player1_score : matchup.player2_score;
-  const theirScore = isPlayer1 ? matchup.player2_score : matchup.player1_score;
+  
+  // Use calculated scores if provided (most accurate), otherwise use stored totals, then fall back to matchup scores
+  const myScore = calculatedMyScore ?? userScore?.total_points ?? (isPlayer1 ? matchup.player1_score : matchup.player2_score);
+  const theirScore = calculatedTheirScore ?? opponentScore?.total_points ?? (isPlayer1 ? matchup.player2_score : matchup.player1_score);
   
   const getMatchupStatus = () => {
     if (!matchup.is_finalized) {

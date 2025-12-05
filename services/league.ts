@@ -4,6 +4,7 @@ import {
   Matchup,
   WeeklyScore,
   PlayoffMatch,
+  User,
   createLeague as createLeagueDB,
   getLeague,
   getUserLeagues,
@@ -21,7 +22,6 @@ import {
   generatePlayoffs as generatePlayoffsDB,
   updatePlayoffScores,
   finalizePlayoffMatch,
-  User,
 } from './supabase';
 import { calculatePoints, FitnessMetrics } from './scoring';
 import { getPlayoffQualifiers, shouldStartPlayoffs, buildPlayoffBracket, PlayoffBracket } from './playoffs';
@@ -52,6 +52,7 @@ export interface LeagueDashboard {
   daysRemaining: number;
   isPlayoffs: boolean;
   playoffBracket: PlayoffBracket | null;
+  isAdmin: boolean;
 }
 
 /**
@@ -61,6 +62,7 @@ export async function createNewLeague(
   name: string,
   seasonLength: 6 | 8 | 10 | 12,
   userId: string,
+  maxPlayers: 4 | 6 | 8 | 10 | 12 | 14,
   scoringConfig?: {
     points_per_1000_steps?: number;
     points_per_sleep_hour?: number;
@@ -69,7 +71,7 @@ export async function createNewLeague(
     points_per_mile?: number;
   } | null
 ): Promise<League> {
-  const league = await createLeagueDB(name, seasonLength, userId, scoringConfig);
+  const league = await createLeagueDB(name, seasonLength, userId, maxPlayers, scoringConfig);
   return league;
 }
 
@@ -130,48 +132,140 @@ export async function getLeagueDashboard(
   const isPlayoffs = league.playoffs_started;
   
   // Get current matchup
-  const currentMatchup = allMatchups.find(
+  let currentMatchup = allMatchups.find(
     m => m.week_number === currentWeek && 
     (m.player1_id === userId || m.player2_id === userId)
   ) || null;
+  
+  // If demo league (opponent is same as user), generate fake opponent
+  if (currentMatchup && currentMatchup.player1_id === currentMatchup.player2_id) {
+    const fakeOpponentNames = [
+      'Alex Runner', 'Jordan Fit', 'Sam Active', 'Taylor Swift', 
+      'Casey Strong', 'Morgan Pace', 'Riley Endurance', 'Quinn Power'
+    ];
+    const opponentIndex = currentWeek % fakeOpponentNames.length;
+    const fakeOpponent: User = {
+      id: `fake-opponent-${currentWeek}`,
+      email: `opponent${currentWeek}@demo.com`,
+      username: fakeOpponentNames[opponentIndex],
+      avatar_url: null,
+      push_token: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Replace opponent with fake user
+    const isPlayer1 = currentMatchup.player1_id === userId;
+    currentMatchup = {
+      ...currentMatchup,
+      player2_id: isPlayer1 ? fakeOpponent.id : currentMatchup.player2_id,
+      player1_id: !isPlayer1 ? fakeOpponent.id : currentMatchup.player1_id,
+      player2: isPlayer1 ? fakeOpponent : currentMatchup.player2,
+      player1: !isPlayer1 ? fakeOpponent : currentMatchup.player1,
+    };
+  }
   
   // Get weekly scores
   let userScore: WeeklyScore | null = null;
   let opponentScore: WeeklyScore | null = null;
   
   if (currentMatchup) {
-    const opponentId = currentMatchup.player1_id === userId 
+    const isPlayer1 = currentMatchup.player1_id === userId;
+    const opponentId = isPlayer1 
       ? currentMatchup.player2_id 
       : currentMatchup.player1_id;
     
+    // Only fetch real scores if opponent is not fake
+    const isFakeOpponent = opponentId.startsWith('fake-opponent-');
+    
     [userScore, opponentScore] = await Promise.all([
       getWeeklyScore(leagueId, userId, currentWeek),
-      getWeeklyScore(leagueId, opponentId, currentWeek),
+      isFakeOpponent ? Promise.resolve(null) : getWeeklyScore(leagueId, opponentId, currentWeek),
     ]);
+    
+    // Generate fake opponent score if needed
+    if (isFakeOpponent && !opponentScore && currentMatchup) {
+      const fakeScore = isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score;
+      opponentScore = {
+        id: `fake-score-${currentWeek}`,
+        league_id: leagueId,
+        user_id: opponentId,
+        week_number: currentWeek,
+        steps: Math.floor(fakeScore * 100),
+        sleep_hours: Math.floor(fakeScore / 20),
+        calories: Math.floor(fakeScore * 50),
+        workouts: Math.floor(fakeScore / 20),
+        distance: Math.floor(fakeScore / 10),
+        total_points: fakeScore,
+        last_synced_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+    }
   }
   
-  // Calculate days remaining in week
-  const daysRemaining = calculateDaysRemainingInWeek(league.start_date, currentWeek);
+  // Calculate days remaining in week (only if league has started)
+  const daysRemaining = league.start_date 
+    ? calculateDaysRemainingInWeek(league.start_date, currentWeek)
+    : 0;
   
   // Build playoff bracket if in playoffs
   const playoffBracket = isPlayoffs ? buildPlayoffBracket(playoffs, members) : null;
   
+  // If demo league (only one real member), generate fake members for standings
+  let displayMembers = [...members];
+  if (members.length === 1 && league.name?.includes('Demo')) {
+    const fakeOpponentNames = [
+      'Alex Runner', 'Jordan Fit', 'Sam Active', 'Casey Strong', 
+      'Morgan Pace', 'Riley Endurance', 'Quinn Power', 'Taylor Swift'
+    ];
+    const fakeMembers: LeagueMember[] = fakeOpponentNames.slice(0, 7).map((name, index) => {
+      const fakeUserId = `fake-member-${index + 1}`;
+      const fakeUser: User = {
+        id: fakeUserId,
+        email: `member${index + 1}@demo.com`,
+        username: name,
+        avatar_url: null,
+        push_token: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return {
+        id: `fake-member-${index + 1}`,
+        league_id: leagueId,
+        user_id: fakeUserId,
+        wins: Math.floor(Math.random() * 3),
+        losses: Math.floor(Math.random() * 3),
+        ties: 0,
+        total_points: 200 + Math.random() * 300,
+        playoff_seed: null,
+        is_eliminated: false,
+        joined_at: new Date().toISOString(),
+        user: fakeUser,
+      };
+    });
+    displayMembers = [...members, ...fakeMembers];
+  }
+  
   // Sort standings
-  const standings = [...members].sort((a, b) => {
+  const standings = displayMembers.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.total_points - a.total_points;
   });
   
+  // Check if user is admin (creator is always admin)
+  const isAdmin = league.created_by === userId;
+  
   return {
     league,
-    members,
+    members: displayMembers,
     currentMatchup,
     userScore,
     opponentScore,
     standings,
     daysRemaining,
     isPlayoffs,
-    playoffBracket,
+    playoffBracket: playoffBracket || null,
+    isAdmin,
   };
 }
 
@@ -280,8 +374,9 @@ function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: num
   if (!startDate) return 7;
   
   const start = new Date(startDate);
-  const weekEnd = new Date(start);
-  weekEnd.setDate(start.getDate() + (currentWeek * 7));
+  // Week N ends at: start_date + (N * 7) days
+  // Create new date to avoid mutating the original
+  const weekEnd = new Date(start.getTime() + (currentWeek * 7 * 24 * 60 * 60 * 1000));
   
   const now = new Date();
   const diffTime = weekEnd.getTime() - now.getTime();

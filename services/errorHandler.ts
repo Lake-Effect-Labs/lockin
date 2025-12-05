@@ -61,7 +61,7 @@ const errorMessages: Record<ErrorType, { message: string; recoverable: boolean; 
     retryable: false,
   },
   LEAGUE_FULL: {
-    message: 'This league is full. Maximum 20 players allowed.',
+    message: 'This league is full.',
     recoverable: false,
     retryable: false,
   },

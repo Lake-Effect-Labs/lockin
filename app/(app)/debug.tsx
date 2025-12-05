@@ -5,10 +5,10 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +27,14 @@ import {
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
+import {
+  runFullRegressionSuite,
+  RegressionTestResults,
+} from '@/services/regressionTests';
+import {
+  runWeeklySimulation,
+  SimulationStep,
+} from '@/services/weeklySimulation';
 import { 
   isBackgroundSyncAvailable, 
   isBackgroundSyncRegistered,
@@ -36,6 +44,8 @@ import {
 } from '@/services/backgroundSync';
 import { simulateLeadChangeNotification } from '@/services/matchupMonitor';
 import { useHealthStore } from '@/store/useHealthStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useLeagueStore } from '@/store/useLeagueStore';
 
 // ============================================
 // DEBUG / TEST SCREEN
@@ -43,10 +53,14 @@ import { useHealthStore } from '@/store/useHealthStore';
 // ============================================
 
 export default function DebugScreen() {
+  const { user } = useAuthStore();
+  const { currentDashboard } = useLeagueStore();
   const [testResults, setTestResults] = useState<E2ETestResults | null>(null);
   const [healthResults, setHealthResults] = useState<HealthTestSuite | null>(null);
+  const [regressionResults, setRegressionResults] = useState<RegressionTestResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isRunningHealth, setIsRunningHealth] = useState(false);
+  const [isRunningRegression, setIsRunningRegression] = useState(false);
   const { fakeMode, setFakeMode } = useHealthStore();
   
   const runTests = () => {
@@ -115,6 +129,92 @@ export default function DebugScreen() {
     );
   };
   
+  const runWeeklySimulationInteractive = async () => {
+    setIsSimulating(true);
+    setCurrentStepIndex(0);
+    
+    // Generate all simulation steps
+    const steps = runWeeklySimulation(8, 8, Date.now());
+    setSimulationSteps(steps);
+    
+    // Show first step
+    setCurrentStepIndex(0);
+    showStep(steps[0], 0, steps.length);
+    
+    setIsSimulating(false);
+  };
+  
+  const showStep = (step: SimulationStep, index: number, total: number) => {
+    if (step.type === 'week') {
+      const weekData = step.data as any;
+      const matchupsText = weekData.matchups.map((m: any, i: number) => 
+        `\n${i + 1}. ${m.player1.name} (${m.player1Score.toFixed(1)}) vs ${m.player2.name} (${m.player2Score.toFixed(1)})${m.isTie ? ' - TIE' : ` - ${m.winner?.name} wins!`}`
+      ).join('');
+      
+      const standingsText = weekData.standings.slice(0, 4).map((p: any, i: number) => 
+        `${i + 1}. ${p.name} (${p.wins}W-${p.losses}L-${p.ties}T) ${p.totalPoints.toFixed(1)}pts`
+      ).join('\n');
+      
+      Alert.alert(
+        `Week ${weekData.week} Results`,
+        `Matchups:${matchupsText}\n\nTop 4 Standings:\n${standingsText}\n\n(${index + 1}/${total})`,
+        [
+          { text: 'Previous', onPress: () => {
+            if (index > 0) {
+              setCurrentStepIndex(index - 1);
+              showStep(simulationSteps[index - 1], index - 1, total);
+            }
+          }, style: index === 0 ? 'cancel' : 'default' },
+          { text: 'Next', onPress: () => {
+            if (index < total - 1) {
+              setCurrentStepIndex(index + 1);
+              showStep(simulationSteps[index + 1], index + 1, total);
+            }
+          } },
+        ]
+      );
+    } else if (step.type === 'playoff_semifinals' || step.type === 'playoff_finals') {
+      const playoffData = step.data as any;
+      const matchupsText = playoffData.matchups.map((m: any, i: number) => 
+        `\n${i + 1}. ${m.player1.name} (${m.player1Score.toFixed(1)}) vs ${m.player2.name} (${m.player2Score.toFixed(1)}) - ${m.winner?.name} advances!`
+      ).join('');
+      
+      Alert.alert(
+        `${playoffData.round === 'semifinals' ? '🏆 Semifinals' : '🏆 Finals'}`,
+        `${playoffData.message}\n\nMatchups:${matchupsText}\n\n(${index + 1}/${total})`,
+        [
+          { text: 'Previous', onPress: () => {
+            if (index > 0) {
+              setCurrentStepIndex(index - 1);
+              showStep(simulationSteps[index - 1], index - 1, total);
+            }
+          } },
+          { text: 'Next', onPress: () => {
+            if (index < total - 1) {
+              setCurrentStepIndex(index + 1);
+              showStep(simulationSteps[index + 1], index + 1, total);
+            }
+          } },
+        ]
+      );
+    } else if (step.type === 'champion') {
+      const champData = step.data as any;
+      Alert.alert(
+        '🏆 CHAMPION CROWNED!',
+        champData.message,
+        [
+          { text: 'Previous', onPress: () => {
+            if (index > 0) {
+              setCurrentStepIndex(index - 1);
+              showStep(simulationSteps[index - 1], index - 1, total);
+            }
+          } },
+          { text: 'Done', style: 'default' },
+        ]
+      );
+    }
+  };
+  
   const runQuickSimulation = () => {
     const sim = runSeasonSimulation(8, 8, Date.now());
     Alert.alert(
@@ -125,6 +225,26 @@ export default function DebugScreen() {
         `${i + 1}. ${p.name} (${p.wins}W-${p.losses}L) ${p.totalPoints.toFixed(0)}pts`
       ).join('\n')
     );
+  };
+  
+  const runRegressionTests = async () => {
+    setIsRunningRegression(true);
+    
+    try {
+      const leagueId = currentDashboard?.league?.id;
+      
+      const results = await runFullRegressionSuite(user?.id, leagueId);
+      setRegressionResults(results);
+      
+      Alert.alert(
+        results.allPassed ? '✅ All Regression Tests Passed!' : '⚠️ Some Regression Tests Failed',
+        results.summary
+      );
+    } catch (error: any) {
+      Alert.alert('❌ Regression Test Error', error.message);
+    } finally {
+      setIsRunningRegression(false);
+    }
   };
   
   // Background Sync Tests
@@ -184,7 +304,13 @@ export default function DebugScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(app)/home');
+              }
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -696,6 +822,52 @@ const styles = StyleSheet.create({
   useCaseText: {
     fontSize: 12,
     color: colors.text.secondary,
+  },
+  regressionResultsCard: {
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  regressionResultsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  regressionSummary: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 8,
+  },
+  simulationProgress: {
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  simulationProgressText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  simulationProgressSubtext: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 8,
+  },
+  viewStepButton: {
+    backgroundColor: colors.primary[500],
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  viewStepButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.primary,
   },
 });
 

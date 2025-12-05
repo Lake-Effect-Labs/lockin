@@ -12,6 +12,7 @@ interface WeekProgressBarProps {
   currentWeek: number;
   totalWeeks: number;
   playoffsStarted?: boolean;
+  hasStarted?: boolean; // Whether league has started
   style?: ViewStyle;
 }
 
@@ -19,9 +20,10 @@ export function WeekProgressBar({
   currentWeek,
   totalWeeks,
   playoffsStarted = false,
+  hasStarted = true,
   style,
 }: WeekProgressBarProps) {
-  const progress = Math.min(currentWeek / totalWeeks, 1);
+  const progress = hasStarted ? Math.min(currentWeek / totalWeeks, 1) : 0;
   const playoffWeeks = 2; // Semis + Finals
   
   return (
@@ -29,7 +31,9 @@ export function WeekProgressBar({
       <View style={styles.header}>
         <Text style={styles.label}>Season Progress</Text>
         <Text style={styles.weekText}>
-          {playoffsStarted 
+          {!hasStarted
+            ? 'Waiting to Start'
+            : playoffsStarted 
             ? 'Playoffs' 
             : `Week ${currentWeek} of ${totalWeeks}`
           }
@@ -56,19 +60,6 @@ export function WeekProgressBar({
         </View>
       </View>
       
-      {/* Week markers */}
-      <View style={styles.markers}>
-        {Array.from({ length: totalWeeks + 1 }).map((_, i) => (
-          <View 
-            key={i}
-            style={[
-              styles.marker,
-              i < currentWeek && styles.markerComplete,
-              i === currentWeek - 1 && styles.markerCurrent,
-            ]}
-          />
-        ))}
-      </View>
     </View>
   );
 }

@@ -20,6 +20,7 @@ export default function AppLayout() {
       <Stack.Screen name="create-league" options={{ presentation: 'modal' }} />
       <Stack.Screen name="join-league" options={{ presentation: 'modal' }} />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="edit-profile" />
       <Stack.Screen name="debug" />
       <Stack.Screen name="league/[leagueId]" />
     </Stack>

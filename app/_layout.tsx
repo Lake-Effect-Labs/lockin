@@ -11,6 +11,7 @@ import { initNetworkMonitoring } from '@/services/errorHandler';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { registerBackgroundSync, isBackgroundSyncAvailable } from '@/services/backgroundSync';
 import { registerForPushNotifications } from '@/services/notifications';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // ============================================
 // ROOT LAYOUT
@@ -48,6 +49,23 @@ export default function RootLayout() {
   
   useEffect(() => {
     if (user?.id) {
+      // Initialize analytics
+      (async () => {
+        try {
+          const { analytics } = await import('@/services/analytics');
+          await analytics.initialize(user.id);
+          analytics.identify(user.id, {
+            email: user.email,
+            username: user.username || undefined,
+          });
+        } catch (error) {
+          // Analytics not critical, continue
+          if (__DEV__) {
+            console.log('⚠️ Analytics not initialized');
+          }
+        }
+      })();
+      
       // Register for push notifications
       registerForPushNotifications(user.id).then((token) => {
         if (token) {
@@ -89,23 +107,25 @@ export default function RootLayout() {
   }
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <View style={styles.appContainer}>
-        <OfflineBanner />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background.primary },
-            animation: 'slide_from_right',
-          }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-          <Stack.Screen name="(app)" />
-        </Stack>
-      </View>
-      <StatusBar style={effectiveTheme === 'dark' ? 'light' : 'dark'} />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <View style={styles.appContainer}>
+          <OfflineBanner />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background.primary },
+              animation: 'slide_from_right',
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(app)" />
+          </Stack>
+        </View>
+        <StatusBar style="light" />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

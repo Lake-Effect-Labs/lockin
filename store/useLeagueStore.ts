@@ -40,6 +40,7 @@ interface LeagueState {
     name: string, 
     seasonLength: 6 | 8 | 10 | 12, 
     userId: string,
+    maxPlayers: 4 | 6 | 8 | 10 | 12 | 14,
     scoringConfig?: {
       points_per_1000_steps?: number;
       points_per_sleep_hour?: number;
@@ -79,7 +80,7 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
   },
 
   // Create a new league
-  createLeague: async (name: string, seasonLength: 6 | 8 | 10 | 12, userId: string, scoringConfig?: {
+  createLeague: async (name: string, seasonLength: 6 | 8 | 10 | 12, userId: string, maxPlayers: 4 | 6 | 8 | 10 | 12 | 14, scoringConfig?: {
     points_per_1000_steps?: number;
     points_per_sleep_hour?: number;
     points_per_100_active_cal?: number;
@@ -88,7 +89,15 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
   } | null) => {
     try {
       set({ isLoading: true, error: null });
-      const league = await createNewLeague(name, seasonLength, userId, scoringConfig);
+      const league = await createNewLeague(name, seasonLength, userId, maxPlayers, scoringConfig);
+      
+      // Track analytics event
+      const { trackLeagueCreated } = await import('@/services/analytics');
+      trackLeagueCreated(league.id, {
+        seasonLength,
+        maxPlayers,
+        hasCustomScoring: scoringConfig !== null,
+      });
       
       // Refresh leagues list
       await get().fetchUserLeagues(userId);
@@ -106,7 +115,16 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
   joinLeague: async (joinCode: string, userId: string) => {
     try {
       set({ isLoading: true, error: null });
-      await joinLeagueService(joinCode, userId);
+      const member = await joinLeagueService(joinCode, userId);
+      
+      // Track analytics event
+      try {
+        const { trackLeagueJoined } = await import('@/services/analytics');
+        // member.league_id is available on LeagueMember
+        trackLeagueJoined(member.league_id, 'code');
+      } catch (e) {
+        // Analytics not critical, continue
+      }
       
       // Refresh leagues list
       await get().fetchUserLeagues(userId);

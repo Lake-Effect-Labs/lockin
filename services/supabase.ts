@@ -65,6 +65,7 @@ export interface League {
   is_active: boolean;
   playoffs_started: boolean;
   champion_id: string | null;
+  max_players: number;
   scoring_config?: {
     points_per_1000_steps?: number;
     points_per_sleep_hour?: number;
@@ -85,6 +86,7 @@ export interface LeagueMember {
   total_points: number;
   playoff_seed: number | null;
   is_eliminated: boolean;
+  is_admin: boolean;
   joined_at: string;
   user?: User;
 }
@@ -185,6 +187,13 @@ export async function signInWithMagicLink(email: string) {
   return data;
 }
 
+export async function resetPassword(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'lockin://auth/reset-password',
+  });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
@@ -258,6 +267,7 @@ export async function createLeague(
   name: string,
   seasonLengthWeeks: number,
   createdBy: string,
+  maxPlayers: number,
   scoringConfig?: {
     points_per_1000_steps?: number;
     points_per_sleep_hour?: number;
@@ -276,7 +286,8 @@ export async function createLeague(
       join_code: joinCode,
       created_by: createdBy,
       season_length_weeks: seasonLengthWeeks,
-      start_date: new Date().toISOString().split('T')[0],
+      max_players: maxPlayers,
+      start_date: null, // Don't start until league is full
       scoring_config: scoringConfig || null,
     })
     .select()
@@ -284,8 +295,20 @@ export async function createLeague(
   
   if (error) throw error;
   
-  // Auto-join creator to league
-  await joinLeague(data.id, createdBy);
+  // Auto-join creator to league as admin
+  const { error: joinError } = await supabase
+    .from('league_members')
+    .insert({ 
+      league_id: data.id, 
+      user_id: createdBy,
+      is_admin: true // Set creator as admin
+    });
+  
+  if (joinError) {
+    // If join fails, try to delete the league
+    await supabase.from('leagues').delete().eq('id', data.id);
+    throw joinError;
+  }
   
   return data;
 }
@@ -349,17 +372,44 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     throw new Error('You are already a member of this league');
   }
   
-  // Check league capacity (max 20 players)
+  // Check league capacity
   const { count } = await supabase
     .from('league_members')
     .select('*', { count: 'exact', head: true })
     .eq('league_id', league.id);
   
-  if (count && count >= 20) {
-    throw new Error('This league is full (maximum 20 players)');
+  if (count && count >= league.max_players) {
+    throw new Error(`This league is full (maximum ${league.max_players} players)`);
   }
   
-  return joinLeague(league.id, userId);
+  const member = await joinLeague(league.id, userId);
+  
+  // Check if league is now full and start it
+  const { count: newCount } = await supabase
+    .from('league_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('league_id', league.id);
+  
+  if (newCount && newCount >= league.max_players && !league.start_date) {
+    // League is now full, start it
+    await supabase
+      .from('leagues')
+      .update({ start_date: new Date().toISOString().split('T')[0] })
+      .eq('id', league.id);
+    
+    // Track analytics event
+    try {
+      const { trackLeagueFull } = await import('./analytics');
+      trackLeagueFull(league.id, league.max_players);
+    } catch (e) {
+      // Analytics not critical, continue
+    }
+    
+    // Generate matchups for week 1
+    await startLeagueSeason(league.id);
+  }
+  
+  return member;
 }
 
 export async function leaveLeague(leagueId: string, userId: string): Promise<void> {

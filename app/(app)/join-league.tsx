@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -23,11 +23,19 @@ import { colors } from '@/utils/colors';
 // ============================================
 
 export default function JoinLeagueScreen() {
-  const [code, setCode] = useState('');
+  const { code: codeFromParams } = useLocalSearchParams<{ code?: string }>();
+  const [code, setCode] = useState(codeFromParams || '');
   const [joined, setJoined] = useState(false);
   
   const { user } = useAuthStore();
   const { joinLeague, isLoading } = useLeagueStore();
+  
+  // Auto-fill code from deep link
+  useEffect(() => {
+    if (codeFromParams) {
+      setCode(codeFromParams.toUpperCase());
+    }
+  }, [codeFromParams]);
   
   const handleJoin = async () => {
     const cleanCode = code.trim().toUpperCase();
@@ -97,7 +105,13 @@ export default function JoinLeagueScreen() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(app)/home');
+                }
+              }}
               style={styles.closeButton}
             >
               <Ionicons name="close" size={24} color={colors.text.primary} />

@@ -27,23 +27,16 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
-      // Initial state
+      // Initial state - always dark mode
       themeMode: 'dark',
       effectiveTheme: 'dark',
       notificationsEnabled: true,
       hapticFeedback: true,
 
-      // Set theme mode
+      // Set theme mode - always dark, no longer used but kept for compatibility
       setThemeMode: (mode: ThemeMode) => {
-        let effectiveTheme: 'light' | 'dark' = 'dark';
-        
-        if (mode === 'system') {
-          effectiveTheme = Appearance.getColorScheme() || 'dark';
-        } else {
-          effectiveTheme = mode;
-        }
-        
-        set({ themeMode: mode, effectiveTheme });
+        // Force dark mode always
+        set({ themeMode: 'dark', effectiveTheme: 'dark' });
       },
 
       // Toggle notifications
@@ -56,21 +49,10 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({ hapticFeedback: !state.hapticFeedback }));
       },
 
-      // Initialize theme based on system preference
+      // Initialize theme - always dark mode
       initializeTheme: () => {
-        const { themeMode } = get();
-        
-        if (themeMode === 'system') {
-          const systemTheme = Appearance.getColorScheme() || 'dark';
-          set({ effectiveTheme: systemTheme });
-        }
-        
-        // Listen for system theme changes
-        Appearance.addChangeListener(({ colorScheme }) => {
-          if (get().themeMode === 'system') {
-            set({ effectiveTheme: colorScheme || 'dark' });
-          }
-        });
+        // Force dark mode always
+        set({ themeMode: 'dark', effectiveTheme: 'dark' });
       },
     }),
     {

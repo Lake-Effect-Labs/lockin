@@ -6,10 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   Share,
   Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { PlayerScoreCard } from '@/components/PlayerScoreCard';
 import { WeekProgressBar, Countdown } from '@/components/WeekProgressBar';
 import { PointsBreakdown } from '@/components/StatBubble';
 import { SyncStatusIndicator, LiveIndicator } from '@/components/SyncStatusIndicator';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 import { colors } from '@/utils/colors';
 
@@ -33,7 +35,7 @@ import { colors } from '@/utils/colors';
 export default function LeagueDashboardScreen() {
   const { leagueId } = useLocalSearchParams<{ leagueId: string }>();
   const { user } = useAuthStore();
-  const { currentDashboard, fetchDashboard, syncScore, isLoading } = useLeagueStore();
+  const { currentDashboard, fetchDashboard, isLoading } = useLeagueStore();
   const { weeklyTotals, lastSyncedAt, fakeMode } = useHealthStore();
   
   // Real-time sync - faster updates (30s) when viewing matchup
@@ -66,30 +68,121 @@ export default function LeagueDashboardScreen() {
     setRefreshing(false);
   }, [leagueId, user, refresh]);
   
-  // Sync health data to league score
-  const handleSyncScore = async () => {
-    if (!leagueId || !user || !weeklyTotals || !currentDashboard) return;
+  
+  const handleCopyCode = async () => {
+    if (!currentDashboard) return;
     
-    await syncScore(
-      leagueId,
-      user.id,
-      currentDashboard.league.current_week,
-      weeklyTotals
-    );
-    await refresh(); // Sync after manual score update
-    Alert.alert('Synced!', 'Your fitness data has been updated');
+    const joinCode = currentDashboard.league.join_code;
+    await Clipboard.setStringAsync(joinCode);
+    Alert.alert('Copied!', `Join code "${joinCode}" copied to clipboard`);
   };
   
   const handleShare = async () => {
     if (!currentDashboard) return;
     
+    const joinCode = currentDashboard.league.join_code;
+    const leagueName = currentDashboard.league.name;
+    const deepLink = `lockin://join?code=${joinCode}`;
+    
+    // Create a nice invitation message
+    const invitationMessage = `🏆 Join my Lock-In fitness league!
+
+"${leagueName}"
+
+Join Code: ${joinCode}
+
+Tap to join: ${deepLink}
+
+Download Lock-In: https://lockin.app/download`;
+
     try {
       await Share.share({
-        message: `Join my Lock-In league "${currentDashboard.league.name}"! Use code: ${currentDashboard.league.join_code}`,
+        message: invitationMessage,
+        url: deepLink, // iOS will use this for universal links
       });
     } catch (err) {
       console.error('Share error:', err);
     }
+  };
+  
+  const handleStartLeague = async () => {
+    if (!currentDashboard || !user) return;
+    
+    Alert.alert(
+      'Start League',
+      'Are you sure you want to start the league? This will generate matchups for Week 1.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { startLeague } = await import('@/services/admin');
+              await startLeague(leagueId, user.id);
+              // Refresh dashboard
+              await fetchDashboard(leagueId, user.id);
+              Alert.alert('Success', 'League started! Matchups have been generated.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to start league');
+            }
+          },
+        },
+      ]
+    );
+  };
+  
+  const handleDeleteLeague = async () => {
+    if (!currentDashboard || !user) return;
+    
+    Alert.alert(
+      'Delete League',
+      'Are you sure you want to delete this league? This action cannot be undone. All data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { deleteLeague } = await import('@/services/admin');
+              await deleteLeague(leagueId, user.id);
+              Alert.alert('Success', 'League deleted.');
+              router.replace('/(app)/home');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete league');
+            }
+          },
+        },
+      ]
+    );
+  };
+  
+  const handleRemoveMember = async (userIdToRemove: string, username: string) => {
+    if (!user) return;
+    
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${username} from this league?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { removeUserFromLeague } = await import('@/services/admin');
+              await removeUserFromLeague(leagueId, userIdToRemove, user.id);
+              // Refresh dashboard
+              await fetchDashboard(leagueId, user.id);
+              Alert.alert('Success', `${username} has been removed from the league.`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to remove member');
+            }
+          },
+        },
+      ]
+    );
   };
   
   if (!currentDashboard) {
@@ -102,7 +195,7 @@ export default function LeagueDashboardScreen() {
     );
   }
   
-  const { league, currentMatchup, userScore, opponentScore, standings, daysRemaining, isPlayoffs } = currentDashboard;
+  const { league, currentMatchup, userScore, opponentScore, standings, daysRemaining, isPlayoffs, isAdmin, members } = currentDashboard;
   
   // Get points breakdown if we have user score (use league-specific scoring config)
   const leagueScoringConfig = league.scoring_config 
@@ -115,6 +208,18 @@ export default function LeagueDashboardScreen() {
     workouts: userScore.workouts,
     distance: userScore.distance,
   }, leagueScoringConfig) : null;
+  
+  const opponentBreakdown = opponentScore ? getPointsBreakdown({
+    steps: opponentScore.steps,
+    sleepHours: opponentScore.sleep_hours,
+    calories: opponentScore.calories,
+    workouts: opponentScore.workouts,
+    distance: opponentScore.distance,
+  }, leagueScoringConfig) : null;
+  
+  // Calculate current scores (use breakdown totals for accuracy)
+  const calculatedMyScore = breakdown?.totalPoints ?? userScore?.total_points ?? 0;
+  const calculatedOpponentScore = opponentBreakdown?.totalPoints ?? opponentScore?.total_points ?? 0;
   
   return (
     <SafeAreaView style={styles.container}>
@@ -132,21 +237,36 @@ export default function LeagueDashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(app)/home');
+              }
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.leagueName} numberOfLines={1}>{league.name}</Text>
-            <Text style={styles.joinCode}>Code: {league.join_code}</Text>
+            <TouchableOpacity 
+              onPress={handleCopyCode}
+              style={styles.codeContainer}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.joinCode}>Code: {league.join_code}</Text>
+              <Ionicons name="copy-outline" size={16} color={colors.text.secondary} style={styles.copyIcon} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={handleShare}
-            style={styles.shareButton}
-          >
-            <Ionicons name="share-outline" size={22} color={colors.text.primary} />
-          </TouchableOpacity>
+          {standings.length < league.max_players && (
+            <TouchableOpacity
+              onPress={handleShare}
+              style={styles.shareButton}
+            >
+              <Ionicons name="share-outline" size={22} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
         </View>
         
         {/* Week Progress */}
@@ -154,6 +274,7 @@ export default function LeagueDashboardScreen() {
           currentWeek={league.current_week}
           totalWeeks={league.season_length_weeks}
           playoffsStarted={isPlayoffs}
+          hasStarted={!!league.start_date}
           style={styles.progressBar}
         />
         
@@ -185,19 +306,33 @@ export default function LeagueDashboardScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.matchupTitleRow}>
-              <Text style={styles.sectionTitle}>Your Matchup</Text>
-              {currentMatchup && <LiveIndicator isLive={!isPlayoffs} />}
+              <Text style={styles.sectionTitle}>
+                {league.start_date ? 'Your Matchup' : 'Waiting to Start'}
+              </Text>
+              {currentMatchup && league.start_date && <LiveIndicator isLive={!isPlayoffs} />}
             </View>
-            {currentMatchup && <Countdown daysRemaining={daysRemaining} />}
+            {currentMatchup && league.start_date && <Countdown daysRemaining={daysRemaining} />}
           </View>
           
-          {currentMatchup ? (
+          {!league.start_date ? (
+            <View style={styles.waitingContainer}>
+              <Ionicons name="hourglass-outline" size={48} color={colors.text.tertiary} />
+              <Text style={styles.waitingText}>
+                The league will start once {league.max_players} players have joined.
+              </Text>
+              <Text style={styles.waitingSubtext}>
+                {members.length} of {league.max_players} players
+              </Text>
+            </View>
+          ) : currentMatchup ? (
             <>
               <LiveMatchupCard
                 matchup={currentMatchup}
                 currentUserId={user?.id || ''}
                 userScore={userScore}
                 opponentScore={opponentScore}
+                calculatedMyScore={calculatedMyScore}
+                calculatedTheirScore={calculatedOpponentScore}
                 daysRemaining={daysRemaining}
                 onPress={() => router.push(`/(app)/league/${leagueId}/matchup`)}
               />
@@ -230,8 +365,11 @@ export default function LeagueDashboardScreen() {
           )}
         </View>
         
+        {/* Ad Banner */}
+        <SmartAdBanner placement="league" />
+        
         {/* Your Stats */}
-        {breakdown && (
+        {breakdown && league.start_date && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Your Week {league.current_week} Stats</Text>
             <PointsBreakdown
@@ -250,52 +388,58 @@ export default function LeagueDashboardScreen() {
           </View>
         )}
         
-        {/* Sync Button */}
-        <TouchableOpacity
-          onPress={handleSyncScore}
-          activeOpacity={0.8}
-          style={styles.syncButtonContainer}
-          disabled={isSyncing}
-        >
-          <LinearGradient
-            colors={isSyncing ? [colors.background.card, colors.background.elevated] : colors.gradients.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.syncButton}
-          >
-            <Ionicons 
-              name={isSyncing ? "sync" : "sync-outline"} 
-              size={20} 
-              color={isSyncing ? colors.text.secondary : colors.text.primary} 
-            />
-            <Text style={[styles.syncButtonText, isSyncing && { color: colors.text.secondary }]}>
-              {isSyncing ? 'Syncing...' : 'Sync Fitness Data'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Admin Section */}
+        {isAdmin && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="shield-checkmark" size={20} color={colors.primary[500]} />
+                <Text style={styles.sectionTitle}>League Admin</Text>
+              </View>
+            </View>
+            
+            <View style={styles.adminActions}>
+              {!league.start_date && (
+                <TouchableOpacity
+                  style={styles.adminButton}
+                  onPress={handleStartLeague}
+                >
+                  <Ionicons name="play-circle" size={20} color={colors.primary[500]} />
+                  <Text style={styles.adminButtonText}>Start League</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity
+                style={[styles.adminButton, styles.adminButtonDanger]}
+                onPress={handleDeleteLeague}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.status.error} />
+                <Text style={[styles.adminButtonText, { color: colors.status.error }]}>
+                  Delete League
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {!league.start_date && standings.length > 1 && (
+              <View style={styles.adminMembers}>
+                <Text style={styles.adminMembersTitle}>Remove Members</Text>
+                {standings.filter(m => m.user_id !== user?.id).map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={styles.adminMemberRow}
+                    onPress={() => handleRemoveMember(member.user_id, member.user?.username || 'Unknown')}
+                  >
+                    <Text style={styles.adminMemberName}>
+                      {member.user?.username || 'Unknown'}
+                    </Text>
+                    <Ionicons name="close-circle" size={20} color={colors.status.error} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
         
-        {/* Quick Standings */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Standings</Text>
-            <TouchableOpacity
-              onPress={() => router.push(`/(app)/league/${leagueId}/standings`)}
-            >
-              <Text style={styles.seeAll}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.standingsList}>
-            {standings.slice(0, 4).map((member, index) => (
-              <PlayerScoreCard
-                key={member.id}
-                member={member}
-                rank={index + 1}
-                isCurrentUser={member.user_id === user?.id}
-                style={styles.standingCard}
-              />
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -396,6 +540,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  adminActions: {
+    gap: 12,
+    marginTop: 12,
+  },
+  adminButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+    backgroundColor: colors.background.elevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  adminButtonDanger: {
+    borderColor: colors.status.error + '40',
+    backgroundColor: colors.status.error + '10',
+  },
+  adminButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  adminMembers: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+  },
+  adminMembersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginBottom: 12,
+  },
+  adminMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: colors.background.elevated,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  adminMemberName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.primary,
+  },
   matchupTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -460,6 +654,25 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  waitingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  waitingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  waitingSubtext: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 8,
+    textAlign: 'center',
   },
   inviteButton: {
     flexDirection: 'row',

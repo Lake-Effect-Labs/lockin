@@ -116,8 +116,9 @@ export function getWeekNumber(startDate: Date | string, currentDate: Date = new 
  */
 export function getDaysRemainingInWeek(startDate: Date | string, weekNumber: number): number {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const weekEnd = new Date(start);
-  weekEnd.setDate(start.getDate() + (weekNumber * 7));
+  // Week N ends at: start_date + (N * 7) days
+  // Use getTime() to avoid date mutation issues
+  const weekEnd = new Date(start.getTime() + (weekNumber * 7 * 24 * 60 * 60 * 1000));
   
   const now = new Date();
   const diffMs = weekEnd.getTime() - now.getTime();

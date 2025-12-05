@@ -128,6 +128,9 @@ export function EmptyLeagueCard({ type, onPress }: EmptyLeagueCardProps) {
       onPress={onPress}
       activeOpacity={0.8}
       style={styles.emptyContainer}
+      accessibilityLabel={isCreate ? 'Create a new league' : 'Join an existing league'}
+      accessibilityRole="button"
+      accessibilityHint={isCreate ? 'Opens the create league screen' : 'Opens the join league screen'}
     >
       <View style={styles.emptyContent}>
         <View style={[

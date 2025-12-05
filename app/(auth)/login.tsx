@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { colors } from '@/utils/colors';
+import { sendLocalNotification } from '@/services/notifications';
+import { resetPassword } from '@/services/supabase';
 
 // ============================================
 // LOGIN SCREEN
@@ -23,39 +24,65 @@ import { colors } from '@/utils/colors';
 // ============================================
 
 export default function LoginScreen() {
+  const { joinCode } = useLocalSearchParams<{ joinCode?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   
-  const { signIn, signInMagicLink, isLoading, error, clearError } = useAuthStore();
+  const { signIn, isLoading } = useAuthStore();
   
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      await sendLocalNotification({
+        title: 'Sign In Failed',
+        body: 'Please enter email and password',
+      });
       return;
     }
     
     try {
       await signIn(email, password);
-      router.replace('/(app)/home');
+      // Redirect to join league if code was provided, otherwise go to home
+      if (joinCode) {
+        router.replace(`/(app)/join-league?code=${joinCode}`);
+      } else {
+        router.replace('/(app)/home');
+      }
     } catch (err: any) {
-      Alert.alert('Sign In Failed', err.message || 'Please check your credentials');
+      // Show notification instead of alert
+      await sendLocalNotification({
+        title: 'Sign In Failed',
+        body: 'Invalid email or password. Please try again.',
+      });
     }
   };
   
-  const handleMagicLink = async () => {
+  const handleForgotPassword = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+      await sendLocalNotification({
+        title: 'Email Required',
+        body: 'Please enter your email address',
+      });
       return;
     }
     
     try {
-      await signInMagicLink(email);
-      setMagicLinkSent(true);
-      Alert.alert('Check Your Email', 'We sent you a magic link to sign in');
+      setIsResettingPassword(true);
+      await resetPassword(email);
+      await sendLocalNotification({
+        title: 'Password Reset Sent',
+        body: 'Check your email for password reset instructions',
+      });
+      setShowForgotPassword(false);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to send magic link');
+      await sendLocalNotification({
+        title: 'Error',
+        body: err.message || 'Failed to send password reset email',
+      });
+    } finally {
+      setIsResettingPassword(false);
     }
   };
   
@@ -121,6 +148,8 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                accessibilityRole="button"
               >
                 <Ionicons 
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
@@ -130,11 +159,53 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
             
+            {/* Forgot Password */}
+            {!showForgotPassword ? (
+              <TouchableOpacity
+                onPress={() => setShowForgotPassword(true)}
+                style={styles.forgotPasswordButton}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.forgotPasswordContainer}>
+                <Text style={styles.forgotPasswordLabel}>
+                  Enter your email and we'll send you reset instructions
+                </Text>
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                disabled={isResettingPassword}
+                style={styles.resetButton}
+                activeOpacity={0.8}
+                accessibilityLabel="Send password reset link"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isResettingPassword }}
+              >
+                  {isResettingPassword ? (
+                    <ActivityIndicator color={colors.primary[500]} />
+                  ) : (
+                    <Text style={styles.resetButtonText}>Send Reset Link</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowForgotPassword(false)}
+                  style={styles.cancelResetButton}
+                  accessibilityLabel="Cancel password reset"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.cancelResetText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
             {/* Sign In Button */}
             <TouchableOpacity
               onPress={handleSignIn}
               disabled={isLoading}
               activeOpacity={0.8}
+              accessibilityLabel="Sign in"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isLoading }}
             >
               <LinearGradient
                 colors={colors.gradients.primary}
@@ -150,30 +221,6 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
             
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-            
-            {/* Magic Link Button */}
-            <TouchableOpacity
-              onPress={handleMagicLink}
-              disabled={isLoading}
-              style={styles.secondaryButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name="sparkles-outline" 
-                size={20} 
-                color={colors.primary[500]}
-                style={styles.buttonIcon}
-              />
-              <Text style={styles.secondaryButtonText}>
-                {magicLinkSent ? 'Resend Magic Link' : 'Sign in with Magic Link'}
-              </Text>
-            </TouchableOpacity>
           </View>
           
           {/* Footer */}
@@ -256,39 +303,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.primary,
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border.default,
-  },
-  dividerText: {
-    color: colors.text.tertiary,
-    paddingHorizontal: 16,
-    fontSize: 14,
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.primary[500],
-    backgroundColor: colors.primary[500] + '10',
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary[500],
-  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -302,6 +316,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary[500],
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: colors.primary[500],
+    fontWeight: '600',
+  },
+  forgotPasswordContainer: {
+    backgroundColor: colors.background.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    gap: 12,
+  },
+  forgotPasswordLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  resetButton: {
+    backgroundColor: colors.primary[500],
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  cancelResetButton: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  cancelResetText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
   },
 });
 

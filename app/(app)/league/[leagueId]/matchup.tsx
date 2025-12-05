@@ -5,8 +5,8 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -14,6 +14,7 @@ import { useLeagueStore } from '@/store/useLeagueStore';
 import { MatchupCard } from '@/components/MatchupCard';
 import { PointsBreakdown } from '@/components/StatBubble';
 import { Avatar } from '@/components/Avatar';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 import { colors, getScoreColor } from '@/utils/colors';
 
@@ -47,8 +48,6 @@ export default function MatchupScreen() {
   
   const isPlayer1 = currentMatchup.player1_id === user?.id;
   const opponent = isPlayer1 ? currentMatchup.player2 : currentMatchup.player1;
-  const myScore = isPlayer1 ? currentMatchup.player1_score : currentMatchup.player2_score;
-  const theirScore = isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score;
   
   // Use league-specific scoring config
   const leagueScoringConfig = league.scoring_config 
@@ -71,6 +70,10 @@ export default function MatchupScreen() {
     distance: opponentScore.distance,
   }, leagueScoringConfig) : null;
   
+  // Use breakdown totals (current data) instead of matchup scores (may be outdated)
+  const myScore = myBreakdown?.totalPoints || (isPlayer1 ? currentMatchup.player1_score : currentMatchup.player2_score);
+  const theirScore = opponentBreakdown?.totalPoints || (isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score);
+  
   const myScoreColor = getScoreColor(myScore, theirScore);
   const theirScoreColor = getScoreColor(theirScore, myScore);
   
@@ -80,7 +83,13 @@ export default function MatchupScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace(`/(app)/league/${leagueId}`);
+              }
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -109,8 +118,13 @@ export default function MatchupScreen() {
           currentUserId={user?.id || ''}
           userScore={userScore}
           opponentScore={opponentScore}
+          calculatedMyScore={myScore}
+          calculatedTheirScore={theirScore}
           style={styles.matchupCard}
         />
+        
+        {/* Ad Banner */}
+        <SmartAdBanner placement="matchup" />
         
         {/* Score Comparison */}
         <View style={styles.comparison}>

@@ -1,17 +1,61 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter, useSegments } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 import { useAuthStore } from '@/store/useAuthStore';
 import { colors } from '@/utils/colors';
 
 // ============================================
 // INDEX / SPLASH SCREEN
-// Redirects based on auth state
+// Redirects based on auth state and handles deep links
 // ============================================
 
 export default function Index() {
   const { user, isInitialized, isLoading } = useAuthStore();
+  const router = useRouter();
+  const segments = useSegments();
+  
+  // Handle deep links
+  useEffect(() => {
+    // Handle initial URL (app opened from link)
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+    
+    // Handle URL while app is running
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+    
+    return () => {
+      subscription.remove();
+    };
+  }, [user, isInitialized]);
+  
+  const handleDeepLink = (url: string) => {
+    if (!isInitialized) return; // Wait for auth to initialize
+    
+    try {
+      const parsed = Linking.parse(url);
+      
+      // Handle join league deep link: lockin://join?code=ABC123
+      if (parsed.path === 'join' && parsed.queryParams?.code) {
+        const code = parsed.queryParams.code as string;
+        if (user) {
+          // User is logged in, navigate to join screen with code
+          router.push(`/(app)/join-league?code=${code}`);
+        } else {
+          // User not logged in, redirect to login with join code
+          router.push(`/(auth)/login?joinCode=${code}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling deep link:', error);
+    }
+  };
   
   // Wait for auth to initialize
   if (!isInitialized || isLoading) {

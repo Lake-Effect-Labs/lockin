@@ -64,13 +64,12 @@ export function PlayerScoreCard({
           {user?.username || 'Unknown'}
           {isCurrentUser && <Text style={styles.youTag}> (You)</Text>}
         </Text>
-        <Text style={styles.record}>{record}</Text>
+        <Text style={styles.totalPoints}>{member.total_points.toFixed(0)} pts</Text>
       </View>
       
-      {/* Points */}
-      <View style={styles.pointsContainer}>
-        <Text style={styles.points}>{member.total_points.toFixed(0)}</Text>
-        <Text style={styles.pointsLabel}>pts</Text>
+      {/* Record */}
+      <View style={styles.recordContainer}>
+        <Text style={styles.record}>{record}</Text>
       </View>
     </View>
   );
@@ -236,22 +235,17 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   record: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  pointsContainer: {
-    alignItems: 'flex-end',
-  },
-  points: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
   },
-  pointsLabel: {
-    fontSize: 11,
+  recordContainer: {
+    alignItems: 'flex-end',
+  },
+  totalPoints: {
+    fontSize: 12,
     color: colors.text.tertiary,
-    textTransform: 'uppercase',
+    marginTop: 2,
   },
   compactContainer: {
     flexDirection: 'row',

@@ -52,8 +52,30 @@ export function Avatar({
     return name.slice(0, 2).toUpperCase();
   };
   
-  // Generate consistent color from name
-  const getGradientColors = (name: string | null | undefined): [string, string] => {
+  // Predefined avatar options (matching edit-profile.tsx)
+  const AVATAR_GRADIENTS: Record<string, [string, string]> = {
+    '1': [colors.primary[500], colors.primary[600]],
+    '2': [colors.secondary[500], colors.secondary[600]],
+    '3': [colors.accent[500], colors.accent[600]],
+    '4': ['#9B59B6', '#8E44AD'],
+    '5': ['#E74C3C', '#C0392B'],
+    '6': ['#3498DB', '#2980B9'],
+    '7': ['#1ABC9C', '#16A085'],
+    '8': ['#F39C12', '#D68910'],
+    '9': ['#E91E63', '#C2185B'],
+    '10': ['#00BCD4', '#0097A7'],
+    '11': ['#795548', '#5D4037'],
+    '12': ['#607D8B', '#455A64'],
+  };
+
+  // Generate consistent color from name or use avatar ID
+  const getGradientColors = (name: string | null | undefined, avatarId?: string | null): [string, string] => {
+    // If avatar ID is provided and valid, use it
+    if (avatarId && AVATAR_GRADIENTS[avatarId]) {
+      return AVATAR_GRADIENTS[avatarId];
+    }
+    
+    // Otherwise generate from name
     if (!name) return [colors.primary[500], colors.primary[600]];
     
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -82,7 +104,11 @@ export function Avatar({
     }),
   };
   
-  if (uri) {
+  // Check if uri is actually an avatar ID (numeric string) or a real image URL
+  const isAvatarId = uri && /^\d+$/.test(uri);
+  
+  if (uri && !isAvatarId) {
+    // Real image URL
     return (
       <View style={[containerStyle, style]}>
         <Image
@@ -94,7 +120,8 @@ export function Avatar({
     );
   }
   
-  const gradientColors = getGradientColors(name);
+  // Use avatar ID if provided, otherwise generate from name
+  const gradientColors = getGradientColors(name, isAvatarId ? uri : null);
   
   return (
     <View style={[containerStyle, style]}>

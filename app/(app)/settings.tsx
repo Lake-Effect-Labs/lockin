@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -25,7 +25,7 @@ import { colors } from '@/utils/colors';
 export default function SettingsScreen() {
   const { user, signOut } = useAuthStore();
   const { fakeMode, setFakeMode } = useHealthStore();
-  const { themeMode, setThemeMode, notificationsEnabled, toggleNotifications } = useSettingsStore();
+  const { notificationsEnabled, toggleNotifications } = useSettingsStore();
   
   const handleSignOut = () => {
     Alert.alert(
@@ -51,7 +51,13 @@ export default function SettingsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(app)/home');
+              }
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -74,7 +80,12 @@ export default function SettingsScreen() {
               <Text style={styles.profileName}>{user?.username || 'Champion'}</Text>
               <Text style={styles.profileEmail}>{user?.email}</Text>
             </View>
-            <TouchableOpacity style={styles.editButton}>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => router.push('/(app)/edit-profile')}
+              accessibilityLabel="Edit profile"
+              accessibilityRole="button"
+            >
               <Ionicons name="pencil" size={18} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
@@ -85,26 +96,6 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>App Settings</Text>
           
           <View style={styles.settingsList}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: colors.secondary[500] + '20' }]}>
-                  <Ionicons name="moon-outline" size={20} color={colors.secondary[500]} />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>Dark Mode</Text>
-                  <Text style={styles.settingDescription}>
-                    {themeMode === 'system' ? 'System' : themeMode === 'dark' ? 'On' : 'Off'}
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={themeMode === 'dark'}
-                onValueChange={(value) => setThemeMode(value ? 'dark' : 'light')}
-                trackColor={{ false: colors.border.default, true: colors.primary[500] }}
-                thumbColor={colors.text.primary}
-              />
-            </View>
-            
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <View style={[styles.settingIcon, { backgroundColor: colors.primary[500] + '20' }]}>
@@ -152,18 +143,54 @@ export default function SettingsScreen() {
               />
             </View>
             
+            {__DEV__ && (
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={() => router.push('/(app)/debug')}
+              >
+                <View style={styles.settingLeft}>
+                  <View style={[styles.settingIcon, { backgroundColor: colors.secondary[500] + '20' }]}>
+                    <Ionicons name="bug-outline" size={20} color={colors.secondary[500]} />
+                  </View>
+                  <View>
+                    <Text style={styles.settingLabel}>Debug & Testing</Text>
+                    <Text style={styles.settingDescription}>
+                      Run validation tests
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
+            
+            {/* Privacy Policy */}
             <TouchableOpacity 
               style={styles.settingItem}
-              onPress={() => router.push('/(app)/debug')}
+              onPress={async () => {
+                const privacyUrl = 'https://lockin.app/privacy'; // Update with your actual URL
+                try {
+                  const supported = await Linking.canOpenURL(privacyUrl);
+                  if (supported) {
+                    await Linking.openURL(privacyUrl);
+                  } else {
+                    Alert.alert('Privacy Policy', `Privacy policy available at ${privacyUrl}`);
+                  }
+                } catch (error) {
+                  Alert.alert('Privacy Policy', `Privacy policy available at ${privacyUrl}`);
+                }
+              }}
+              accessibilityLabel="View privacy policy"
+              accessibilityRole="link"
+              accessibilityHint="Opens privacy policy in browser"
             >
               <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: colors.secondary[500] + '20' }]}>
-                  <Ionicons name="bug-outline" size={20} color={colors.secondary[500]} />
+                <View style={[styles.settingIcon, { backgroundColor: colors.primary[500] + '20' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary[500]} />
                 </View>
                 <View>
-                  <Text style={styles.settingLabel}>Debug & Testing</Text>
+                  <Text style={styles.settingLabel}>Privacy Policy</Text>
                   <Text style={styles.settingDescription}>
-                    Run validation tests
+                    View our privacy policy
                   </Text>
                 </View>
               </View>
@@ -178,6 +205,9 @@ export default function SettingsScreen() {
             onPress={handleSignOut}
             style={styles.signOutButton}
             activeOpacity={0.8}
+            accessibilityLabel="Sign out"
+            accessibilityRole="button"
+            accessibilityHint="Signs out of your account"
           >
             <Ionicons name="log-out-outline" size={20} color={colors.status.error} />
             <Text style={styles.signOutText}>Sign Out</Text>

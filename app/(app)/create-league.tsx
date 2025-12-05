@@ -13,6 +13,7 @@ import {
   Share,
   Switch,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,9 +34,19 @@ const SEASON_OPTIONS = [
   { value: 12, label: '12 Weeks', description: 'Full season' },
 ];
 
+const LEAGUE_SIZE_OPTIONS = [
+  { value: 4, label: '4 Players' },
+  { value: 6, label: '6 Players' },
+  { value: 8, label: '8 Players' },
+  { value: 10, label: '10 Players' },
+  { value: 12, label: '12 Players' },
+  { value: 14, label: '14 Players' },
+];
+
 export default function CreateLeagueScreen() {
   const [name, setName] = useState('');
   const [seasonLength, setSeasonLength] = useState<6 | 8 | 10 | 12>(8);
+  const [maxPlayers, setMaxPlayers] = useState<4 | 6 | 8 | 10 | 12 | 14>(8);
   const [useDefaultScoring, setUseDefaultScoring] = useState(true);
   const [scoringConfig, setScoringConfig] = useState({
     points_per_1000_steps: DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS,
@@ -44,7 +55,7 @@ export default function CreateLeagueScreen() {
     points_per_workout: DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT,
     points_per_mile: DEFAULT_SCORING_CONFIG.POINTS_PER_MILE,
   });
-  const [createdLeague, setCreatedLeague] = useState<{ name: string; join_code: string } | null>(null);
+  const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string; join_code: string } | null>(null);
   
   const { user } = useAuthStore();
   const { createLeague, isLoading } = useLeagueStore();
@@ -62,8 +73,8 @@ export default function CreateLeagueScreen() {
     
     try {
       const config = useDefaultScoring ? null : scoringConfig;
-      const league = await createLeague(name.trim(), seasonLength, user.id, config);
-      setCreatedLeague({ name: league.name, join_code: league.join_code });
+      const league = await createLeague(name.trim(), seasonLength, user.id, maxPlayers, config);
+      setCreatedLeague({ id: league.id, name: league.name, join_code: league.join_code });
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to create league');
     }
@@ -72,9 +83,25 @@ export default function CreateLeagueScreen() {
   const handleShare = async () => {
     if (!createdLeague) return;
     
+    const joinCode = createdLeague.join_code;
+    const leagueName = createdLeague.name;
+    const deepLink = `lockin://join?code=${joinCode}`;
+    
+    // Create a nice invitation message
+    const invitationMessage = `🏆 Join my Lock-In fitness league!
+
+"${leagueName}"
+
+Join Code: ${joinCode}
+
+Tap to join: ${deepLink}
+
+Download Lock-In: https://lockin.app/download`;
+
     try {
       await Share.share({
-        message: `Join my Lock-In fitness league "${createdLeague.name}"! Use code: ${createdLeague.join_code}`,
+        message: invitationMessage,
+        url: deepLink, // iOS will use this for universal links
       });
     } catch (err) {
       console.error('Share error:', err);
@@ -83,7 +110,7 @@ export default function CreateLeagueScreen() {
   
   const handleDone = () => {
     if (createdLeague) {
-      router.replace('/(app)/home');
+      router.replace(`/(app)/league/${createdLeague.id}`);
     }
   };
   
@@ -103,7 +130,14 @@ export default function CreateLeagueScreen() {
           
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Share this code with friends</Text>
-            <Text style={styles.codeValue}>{createdLeague.join_code}</Text>
+            <TouchableOpacity 
+              onPress={handleCopyCode}
+              style={styles.codeValueContainer}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.codeValue}>{createdLeague.join_code}</Text>
+              <Ionicons name="copy-outline" size={18} color={colors.primary[500]} style={styles.copyIcon} />
+            </TouchableOpacity>
           </View>
           
           <TouchableOpacity
@@ -149,7 +183,13 @@ export default function CreateLeagueScreen() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(app)/home');
+                }
+              }}
               style={styles.closeButton}
             >
               <Ionicons name="close" size={24} color={colors.text.primary} />
@@ -210,6 +250,34 @@ export default function CreateLeagueScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+            
+            {/* League Size */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>League Size</Text>
+              <View style={styles.sizeOptions}>
+                {LEAGUE_SIZE_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setMaxPlayers(option.value as 4 | 6 | 8 | 10 | 12 | 14)}
+                    style={[
+                      styles.sizeOption,
+                      maxPlayers === option.value && styles.sizeOptionActive,
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[
+                      styles.sizeLabel,
+                      maxPlayers === option.value && styles.sizeLabelActive,
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.sizeHint}>
+                League will start automatically when full
+              </Text>
             </View>
             
             {/* Scoring Configuration */}
@@ -475,6 +543,39 @@ const styles = StyleSheet.create({
   seasonDescriptionActive: {
     color: colors.text.secondary,
   },
+  sizeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  sizeOption: {
+    width: '30%',
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: colors.border.default,
+    alignItems: 'center',
+  },
+  sizeOptionActive: {
+    borderColor: colors.primary[500],
+    backgroundColor: colors.primary[500] + '10',
+  },
+  sizeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  sizeLabelActive: {
+    color: colors.primary[500],
+    fontWeight: '700',
+  },
+  sizeHint: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginTop: 8,
+    marginLeft: 4,
+  },
   infoCard: {
     flexDirection: 'row',
     backgroundColor: colors.background.card,
@@ -547,11 +648,19 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: 12,
   },
+  codeValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   codeValue: {
     fontSize: 36,
     fontWeight: '800',
     color: colors.primary[500],
     letterSpacing: 4,
+    marginRight: 8,
+  },
+  copyIcon: {
+    marginLeft: 4,
   },
   shareButton: {
     flexDirection: 'row',
