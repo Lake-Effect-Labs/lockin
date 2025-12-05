@@ -1,0 +1,17 @@
+# Assets Folder
+
+Add your app assets here:
+
+- icon.png (1024x1024) - App icon
+- splash.png (1284x2778) - Splash screen  
+- adaptive-icon.png (1024x1024) - Android adaptive icon
+- favicon.png (48x48) - Web favicon
+- notification-icon.png (96x96) - Notification icon
+
+You can generate these using tools like:
+- https://icon.kitchen/
+- https://appicon.co/
+- Figma/Sketch
+
+For a quick start, you can use placeholder images or generate them with AI tools.
+

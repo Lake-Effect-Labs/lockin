@@ -1,0 +1,436 @@
+import React, { useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+} from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useLeagueStore } from '@/store/useLeagueStore';
+import { MatchupCard } from '@/components/MatchupCard';
+import { PointsBreakdown } from '@/components/StatBubble';
+import { Avatar } from '@/components/Avatar';
+import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
+import { colors, getScoreColor } from '@/utils/colors';
+
+// ============================================
+// MATCHUP DETAIL SCREEN
+// Detailed view of current matchup
+// ============================================
+
+export default function MatchupScreen() {
+  const { leagueId } = useLocalSearchParams<{ leagueId: string }>();
+  const { user } = useAuthStore();
+  const { currentDashboard, fetchDashboard } = useLeagueStore();
+  
+  useEffect(() => {
+    if (leagueId && user && !currentDashboard) {
+      fetchDashboard(leagueId, user.id);
+    }
+  }, [leagueId, user]);
+  
+  if (!currentDashboard || !currentDashboard.currentMatchup) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>No active matchup</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  const { currentMatchup, userScore, opponentScore, league, daysRemaining } = currentDashboard;
+  
+  const isPlayer1 = currentMatchup.player1_id === user?.id;
+  const opponent = isPlayer1 ? currentMatchup.player2 : currentMatchup.player1;
+  const myScore = isPlayer1 ? currentMatchup.player1_score : currentMatchup.player2_score;
+  const theirScore = isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score;
+  
+  // Use league-specific scoring config
+  const leagueScoringConfig = league.scoring_config 
+    ? getScoringConfig(league.scoring_config)
+    : undefined;
+  
+  const myBreakdown = userScore ? getPointsBreakdown({
+    steps: userScore.steps,
+    sleepHours: userScore.sleep_hours,
+    calories: userScore.calories,
+    workouts: userScore.workouts,
+    distance: userScore.distance,
+  }, leagueScoringConfig) : null;
+  
+  const opponentBreakdown = opponentScore ? getPointsBreakdown({
+    steps: opponentScore.steps,
+    sleepHours: opponentScore.sleep_hours,
+    calories: opponentScore.calories,
+    workouts: opponentScore.workouts,
+    distance: opponentScore.distance,
+  }, leagueScoringConfig) : null;
+  
+  const myScoreColor = getScoreColor(myScore, theirScore);
+  const theirScoreColor = getScoreColor(theirScore, myScore);
+  
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Week {currentMatchup.week_number} Matchup</Text>
+          <View style={styles.placeholder} />
+        </View>
+        
+        {/* Status Banner */}
+        <View style={styles.statusBanner}>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE</Text>
+          </View>
+          <Text style={styles.countdown}>
+            {daysRemaining === 0 
+              ? 'Week ends today!' 
+              : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`
+            }
+          </Text>
+        </View>
+        
+        {/* Main Matchup Card */}
+        <MatchupCard
+          matchup={currentMatchup}
+          currentUserId={user?.id || ''}
+          userScore={userScore}
+          opponentScore={opponentScore}
+          style={styles.matchupCard}
+        />
+        
+        {/* Score Comparison */}
+        <View style={styles.comparison}>
+          <View style={styles.comparisonHeader}>
+            <Text style={styles.comparisonTitle}>Score Breakdown</Text>
+          </View>
+          
+          {/* Players Row */}
+          <View style={styles.playersRow}>
+            <View style={styles.playerColumn}>
+              <Avatar
+                uri={user?.avatar_url}
+                name={user?.username}
+                size="medium"
+              />
+              <Text style={styles.playerName}>You</Text>
+            </View>
+            <View style={styles.vsColumn}>
+              <Text style={styles.vsText}>VS</Text>
+            </View>
+            <View style={styles.playerColumn}>
+              <Avatar
+                uri={opponent?.avatar_url}
+                name={opponent?.username}
+                size="medium"
+              />
+              <Text style={styles.playerName}>{opponent?.username || 'Opponent'}</Text>
+            </View>
+          </View>
+          
+          {/* Stats Comparison */}
+          <View style={styles.statsComparison}>
+            <StatComparisonRow
+              icon="👟"
+              label="Steps"
+              value1={userScore?.steps || 0}
+              value2={opponentScore?.steps || 0}
+              format={(v) => v.toLocaleString()}
+            />
+            <StatComparisonRow
+              icon="😴"
+              label="Sleep"
+              value1={userScore?.sleep_hours || 0}
+              value2={opponentScore?.sleep_hours || 0}
+              format={(v) => `${v.toFixed(1)}h`}
+            />
+            <StatComparisonRow
+              icon="🔥"
+              label="Calories"
+              value1={userScore?.calories || 0}
+              value2={opponentScore?.calories || 0}
+              format={(v) => v.toLocaleString()}
+            />
+            <StatComparisonRow
+              icon="💪"
+              label="Workouts"
+              value1={userScore?.workouts || 0}
+              value2={opponentScore?.workouts || 0}
+              format={(v) => v.toString()}
+            />
+            <StatComparisonRow
+              icon="🏃"
+              label="Distance"
+              value1={userScore?.distance || 0}
+              value2={opponentScore?.distance || 0}
+              format={(v) => `${v.toFixed(1)} mi`}
+            />
+          </View>
+          
+          {/* Total Points */}
+          <View style={styles.totalRow}>
+            <Text style={[styles.totalValue, { color: myScoreColor }]}>
+              {myScore.toFixed(1)}
+            </Text>
+            <Text style={styles.totalLabel}>TOTAL POINTS</Text>
+            <Text style={[styles.totalValue, { color: theirScoreColor }]}>
+              {theirScore.toFixed(1)}
+            </Text>
+          </View>
+        </View>
+        
+        {/* Your Detailed Breakdown */}
+        {myBreakdown && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Points Breakdown</Text>
+            <PointsBreakdown
+              steps={userScore?.steps || 0}
+              stepsPoints={myBreakdown.stepsPoints}
+              sleep={userScore?.sleep_hours || 0}
+              sleepPoints={myBreakdown.sleepPoints}
+              calories={userScore?.calories || 0}
+              caloriesPoints={myBreakdown.caloriesPoints}
+              workouts={userScore?.workouts || 0}
+              workoutsPoints={myBreakdown.workoutsPoints}
+              distance={userScore?.distance || 0}
+              distancePoints={myBreakdown.distancePoints}
+              totalPoints={myBreakdown.totalPoints}
+            />
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// Stat comparison row component
+interface StatComparisonRowProps {
+  icon: string;
+  label: string;
+  value1: number;
+  value2: number;
+  format: (v: number) => string;
+}
+
+function StatComparisonRow({ icon, label, value1, value2, format }: StatComparisonRowProps) {
+  const isWinning = value1 > value2;
+  const isLosing = value1 < value2;
+  
+  return (
+    <View style={styles.statRow}>
+      <Text style={[
+        styles.statValue,
+        isWinning && styles.statWinning,
+        isLosing && styles.statLosing,
+      ]}>
+        {format(value1)}
+      </Text>
+      <View style={styles.statCenter}>
+        <Text style={styles.statIcon}>{icon}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
+      <Text style={[
+        styles.statValue,
+        !isWinning && !isLosing ? {} : isWinning ? styles.statLosing : styles.statWinning,
+      ]}>
+        {format(value2)}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  placeholder: {
+    width: 40,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.status.error,
+  },
+  liveText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.status.error,
+    letterSpacing: 1,
+  },
+  countdown: {
+    fontSize: 13,
+    color: colors.text.secondary,
+  },
+  matchupCard: {
+    marginBottom: 20,
+  },
+  comparison: {
+    backgroundColor: colors.background.card,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    marginBottom: 24,
+  },
+  comparisonHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  comparisonTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  playersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  playerColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  playerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 8,
+  },
+  vsColumn: {
+    paddingHorizontal: 16,
+  },
+  vsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text.tertiary,
+  },
+  statsComparison: {
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  statWinning: {
+    color: colors.status.success,
+  },
+  statLosing: {
+    color: colors.status.error,
+  },
+  statCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statIcon: {
+    fontSize: 16,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+  },
+  totalValue: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  totalLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 12,
+  },
+});
+
