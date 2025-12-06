@@ -61,13 +61,19 @@ export default function CreateLeagueScreen() {
   const { createLeague, isLoading } = useLeagueStore();
   
   const handleCreate = async () => {
+    // Validation
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a league name');
+      Alert.alert('League Name Required', 'Please enter a name for your league');
+      return;
+    }
+    
+    if (name.trim().length > 30) {
+      Alert.alert('Name Too Long', 'League name must be 30 characters or less');
       return;
     }
     
     if (!user) {
-      Alert.alert('Error', 'You must be logged in');
+      Alert.alert('Sign In Required', 'You must be signed in to create a league');
       return;
     }
     
@@ -76,7 +82,27 @@ export default function CreateLeagueScreen() {
       const league = await createLeague(name.trim(), seasonLength, user.id, maxPlayers, config);
       setCreatedLeague({ id: league.id, name: league.name, join_code: league.join_code });
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to create league');
+      // Better error messages
+      let errorMessage = 'Failed to create league. Please try again.';
+      if (err.message?.includes('already exists')) {
+        errorMessage = 'A league with this name already exists. Please choose a different name.';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      Alert.alert('Unable to Create League', errorMessage);
+    }
+  };
+  
+  const handleCopyCode = async () => {
+    if (!createdLeague) return;
+    
+    try {
+      await Clipboard.setStringAsync(createdLeague.join_code);
+      Alert.alert('Copied!', `Join code "${createdLeague.join_code}" has been copied to your clipboard. Share it with friends!`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy code. Please try again.');
     }
   };
   
@@ -217,7 +243,14 @@ Download Lock-In: https://lockin.app/download`;
                   value={name}
                   onChangeText={setName}
                   maxLength={30}
+                  autoCapitalize="words"
+                  autoCorrect={false}
                 />
+                {name.length > 0 && (
+                  <Text style={styles.charCount}>
+                    {name.length}/30
+                  </Text>
+                )}
               </View>
             </View>
             
@@ -419,21 +452,30 @@ Download Lock-In: https://lockin.app/download`;
             {/* Create Button */}
             <TouchableOpacity
               onPress={handleCreate}
-              disabled={isLoading}
+              disabled={isLoading || !name.trim()}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={colors.gradients.primary}
+                colors={isLoading || !name.trim() ? [colors.background.card, colors.background.elevated] : colors.gradients.primary}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.createButton}
+                style={[styles.createButton, (isLoading || !name.trim()) && styles.createButtonDisabled]}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.text.primary} />
                 ) : (
                   <>
-                    <Ionicons name="add-circle-outline" size={20} color={colors.text.primary} />
-                    <Text style={styles.createButtonText}>Create League</Text>
+                    <Ionicons 
+                      name="add-circle-outline" 
+                      size={20} 
+                      color={name.trim() ? colors.text.primary : colors.text.tertiary} 
+                    />
+                    <Text style={[
+                      styles.createButtonText,
+                      !name.trim() && styles.createButtonTextDisabled
+                    ]}>
+                      Create League
+                    </Text>
                   </>
                 )}
               </LinearGradient>
@@ -508,6 +550,11 @@ const styles = StyleSheet.create({
     height: 56,
     fontSize: 16,
     color: colors.text.primary,
+  },
+  charCount: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+    marginLeft: 8,
   },
   seasonOptions: {
     flexDirection: 'row',
@@ -603,6 +650,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
+  },
+  createButtonDisabled: {
+    opacity: 0.6,
+  },
+  createButtonTextDisabled: {
+    color: colors.text.tertiary,
   },
   successContent: {
     flex: 1,

@@ -65,10 +65,14 @@ export async function startLeague(leagueId: string, adminUserId: string): Promis
     throw new Error('League needs at least 2 players to start');
   }
   
-  // Start the league
+  // Start the league on next Monday (leagues start on Mondays)
+  const { getNextMonday } = require('../utils/dates');
+  const nextMonday = getNextMonday();
+  const startDate = nextMonday.toISOString().split('T')[0];
+  
   const { error: updateError } = await supabase
     .from('leagues')
-    .update({ start_date: new Date().toISOString().split('T')[0] })
+    .update({ start_date: startDate })
     .eq('id', leagueId);
   
   if (updateError) throw updateError;

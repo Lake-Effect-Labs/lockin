@@ -6,8 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +22,9 @@ import { LeagueCard, EmptyLeagueCard } from '@/components/LeagueCard';
 import { Avatar } from '@/components/Avatar';
 import { StatsGrid } from '@/components/StatBubble';
 import { SmartAdBanner } from '@/components/AdBanner';
+import { NetworkErrorBanner } from '@/components/NetworkErrorBanner';
 import { colors } from '@/utils/colors';
+import { getIsOnline } from '@/services/errorHandler';
 
 // ============================================
 // HOME SCREEN
@@ -28,19 +33,40 @@ import { colors } from '@/utils/colors';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
-  const { leagues, fetchUserLeagues, isLoading } = useLeagueStore();
+  const { leagues, fetchUserLeagues, isLoading, error: leagueError } = useLeagueStore();
   const { weeklyTotals, weeklyPoints, syncWeekData, fakeMode, lastSyncedAt } = useHealthStore();
   
   // Real-time sync hook - handles automatic background syncing
   const { isSyncing, refresh } = useRealtimeSync();
   
   const [refreshing, setRefreshing] = React.useState(false);
+  const [isOnline, setIsOnline] = React.useState(getIsOnline());
+  const [showWelcome, setShowWelcome] = React.useState(false);
+  
+  // Show welcome message for first-time users (no leagues)
+  React.useEffect(() => {
+    if (!isLoading && leagues.length === 0 && user) {
+      // Check if user has seen welcome before
+      AsyncStorage.getItem('has_seen_welcome').then((seen) => {
+        if (!seen) {
+          setShowWelcome(true);
+        }
+      });
+    }
+  }, [isLoading, leagues.length, user]);
   
   useEffect(() => {
     if (user) {
       fetchUserLeagues(user.id);
     }
   }, [user]);
+  
+  // Monitor network status
+  React.useEffect(() => {
+    const checkNetwork = () => setIsOnline(getIsOnline());
+    const interval = setInterval(checkNetwork, 5000);
+    return () => clearInterval(interval);
+  }, []);
   
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -52,6 +78,11 @@ export default function HomeScreen() {
     }
     setRefreshing(false);
   }, [user, refresh]);
+
+  const dismissWelcome = useCallback(async () => {
+    setShowWelcome(false);
+    await AsyncStorage.setItem('has_seen_welcome', 'true');
+  }, []);
   
   const stats = weeklyTotals ? [
     { icon: '👟', value: weeklyTotals.steps.toLocaleString(), label: 'Steps', color: colors.primary[500] },
@@ -75,6 +106,24 @@ export default function HomeScreen() {
           />
         }
       >
+        {/* Welcome Banner for First-Time Users */}
+        {showWelcome && (
+          <View style={styles.welcomeBanner}>
+            <View style={styles.welcomeContent}>
+              <Text style={styles.welcomeEmoji}>👋</Text>
+              <View style={styles.welcomeTextContainer}>
+                <Text style={styles.welcomeTitle}>Welcome to Lock-In!</Text>
+                <Text style={styles.welcomeText}>
+                  Create or join a league to compete in weekly fitness matchups. Your health data syncs automatically!
+                </Text>
+              </View>
+              <TouchableOpacity onPress={dismissWelcome} style={styles.welcomeClose}>
+                <Ionicons name="close" size={20} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -94,6 +143,30 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
         </View>
+        
+        {/* Network Error Banner */}
+        {!isOnline && (
+          <NetworkErrorBanner 
+            onRetry={() => {
+              if (user) {
+                fetchUserLeagues(user.id);
+                refresh();
+              }
+            }}
+          />
+        )}
+        
+        {/* League Error Banner */}
+        {leagueError && isOnline && (
+          <NetworkErrorBanner 
+            message={leagueError}
+            onRetry={() => {
+              if (user) {
+                fetchUserLeagues(user.id);
+              }
+            }}
+          />
+        )}
         
         {/* Fake Mode Banner */}
         {fakeMode && (
@@ -127,8 +200,17 @@ export default function HomeScreen() {
               <Text style={styles.emptyStatsText}>
                 {fakeMode 
                   ? 'Fake data mode is active. Health data will sync automatically.'
-                  : 'Your fitness data will appear here once synced. Make sure HealthKit permissions are enabled.'}
+                  : 'Your fitness data will appear here once synced. Make sure HealthKit permissions are enabled in Settings.'}
               </Text>
+              {!fakeMode && Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => router.push('/(app)/settings')}
+                >
+                  <Ionicons name="settings-outline" size={16} color={colors.primary[500]} />
+                  <Text style={styles.settingsButtonText}>Open Settings</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -140,7 +222,12 @@ export default function HomeScreen() {
             <Text style={styles.sectionCount}>{leagues.length}</Text>
           </View>
           
-          {leagues.length > 0 ? (
+          {isLoading && leagues.length === 0 ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color={colors.primary[500]} />
+              <Text style={styles.emptyTitle}>Loading leagues...</Text>
+            </View>
+          ) : leagues.length > 0 ? (
             <View style={styles.leaguesList}>
               {leagues.map((league, index) => (
                 <React.Fragment key={league.id}>
@@ -160,9 +247,13 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
+              <Ionicons name="trophy-outline" size={64} color={colors.text.tertiary} />
               <Text style={styles.emptyTitle}>No Leagues Yet</Text>
               <Text style={styles.emptyText}>
-                Create a league to compete with friends or join an existing one
+                Get started by creating your own league or joining one with a code from a friend
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Compete in weekly fitness matchups and see who's the fittest! 🏆
               </Text>
             </View>
           )}
@@ -310,6 +401,12 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
   },
+  emptySubtext: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   emptyStatsCard: {
     alignItems: 'center',
     padding: 32,
@@ -358,6 +455,57 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 12,
     color: colors.text.secondary,
+  },
+  settingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.primary[500] + '20',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary[500] + '40',
+  },
+  settingsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary[500],
+  },
+  welcomeBanner: {
+    backgroundColor: colors.primary[500] + '20',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.primary[500] + '40',
+  },
+  welcomeContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  welcomeEmoji: {
+    fontSize: 32,
+  },
+  welcomeTextContainer: {
+    flex: 1,
+  },
+  welcomeTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  welcomeText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    lineHeight: 18,
+  },
+  welcomeClose: {
+    padding: 4,
   },
 });
 

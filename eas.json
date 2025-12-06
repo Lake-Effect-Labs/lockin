@@ -30,6 +30,15 @@
         "buildType": "apk"
       }
     },
+    "testflight": {
+      "distribution": "store",
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production"
+      }
+    },
     "production": {
       "ios": {
         "buildConfiguration": "Release"

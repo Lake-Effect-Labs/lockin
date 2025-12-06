@@ -107,18 +107,42 @@ async function performBackgroundSync(): Promise<BackgroundSyncResult> {
       if (!league.is_active) continue;
       
       const fullLeague = await getLeague(league.id);
-      if (!fullLeague) continue;
+      if (!fullLeague || !fullLeague.start_date) continue; // Skip leagues that haven't started
+      
+      // Get league-specific week date range
+      const { getWeekDateRange } = await import('./league');
+      const weekRange = getWeekDateRange(fullLeague.start_date, fullLeague.current_week);
+      
+      // Get health data for this specific league week (not calendar week!)
+      const { getHealthDataRange } = await import('./health');
+      const today = new Date();
+      const weekEnd = weekRange.end > today ? today : weekRange.end; // Don't fetch future dates
+      
+      let leagueMetrics = weeklyMetrics; // Default to aggregated metrics
+      
+      // If we can get league-specific data, use it
+      if (weekRange.start <= today) {
+        try {
+          const weekData = await getHealthDataRange(weekRange.start, weekEnd);
+          if (weekData.length > 0) {
+            const { aggregateWeeklyMetrics } = await import('./scoring');
+            leagueMetrics = aggregateWeeklyMetrics(weekData);
+          }
+        } catch (error) {
+          // Use aggregated metrics if league-specific fetch fails
+        }
+      }
       
       await upsertWeeklyScore(
         league.id,
         userId,
         fullLeague.current_week,
         {
-          steps: weeklyMetrics.steps,
-          sleep_hours: weeklyMetrics.sleepHours,
-          calories: weeklyMetrics.calories,
-          workouts: weeklyMetrics.workouts,
-          distance: weeklyMetrics.distance,
+          steps: leagueMetrics.steps,
+          sleep_hours: leagueMetrics.sleepHours,
+          calories: leagueMetrics.calories,
+          workouts: leagueMetrics.workouts,
+          distance: leagueMetrics.distance,
         }
       );
       

@@ -239,6 +239,7 @@ export async function getLeagueDashboard(
         total_points: 200 + Math.random() * 300,
         playoff_seed: null,
         is_eliminated: false,
+        is_admin: false,
         joined_at: new Date().toISOString(),
         user: fakeUser,
       };
@@ -299,12 +300,27 @@ export async function processWeekEnd(leagueId: string): Promise<boolean> {
   
   if (daysRemaining > 0) return false;
   
-  // Finalize the week
+  // Check if playoffs should start BEFORE finalizing (since finalizeWeek advances current_week)
+  // After finalization, currentWeek will be currentWeek + 1
+  const nextWeek = currentWeek + 1;
+  const shouldStartPlayoffsAfterFinalization = shouldStartPlayoffs(nextWeek, league.season_length_weeks, league.playoffs_started);
+  
+  // Finalize the week (this advances current_week by 1)
   await finalizeWeek(leagueId, currentWeek);
   
-  // Check if playoffs should start
-  if (shouldStartPlayoffs(currentWeek + 1, league.season_length_weeks, league.playoffs_started)) {
-    await generatePlayoffsDB(leagueId);
+  // Check if playoffs should start (after week advancement)
+  if (shouldStartPlayoffsAfterFinalization) {
+    try {
+      await generatePlayoffsDB(leagueId);
+    } catch (error: any) {
+      // Handle case where league has < 4 players gracefully
+      if (error.message?.includes('Not enough players')) {
+        console.warn(`Cannot start playoffs for league ${leagueId}: Not enough players (need 4)`);
+        // Don't throw - league can continue without playoffs
+      } else {
+        throw error;
+      }
+    }
   }
   
   return true;
@@ -373,10 +389,18 @@ export function isLeagueCreator(league: League, userId: string): boolean {
 function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: number): number {
   if (!startDate) return 7;
   
+  // startDate should be a Monday, and weeks run Monday-Sunday
   const start = new Date(startDate);
-  // Week N ends at: start_date + (N * 7) days
-  // Create new date to avoid mutating the original
-  const weekEnd = new Date(start.getTime() + (currentWeek * 7 * 24 * 60 * 60 * 1000));
+  
+  // Calculate the start of the current week (Monday)
+  // Week 1 starts on startDate (which is a Monday)
+  // Week N starts on startDate + (N-1) * 7 days
+  const weekStart = new Date(start.getTime() + ((currentWeek - 1) * 7 * 24 * 60 * 60 * 1000));
+  
+  // Week ends on Sunday (6 days after Monday)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
   
   const now = new Date();
   const diffTime = weekEnd.getTime() - now.getTime();
@@ -398,12 +422,26 @@ export function formatCountdown(daysRemaining: number): string {
  * Get week date range
  */
 export function getWeekDateRange(startDate: string | null, weekNumber: number): { start: Date; end: Date } {
-  const start = startDate ? new Date(startDate) : new Date();
-  const weekStart = new Date(start);
-  weekStart.setDate(start.getDate() + ((weekNumber - 1) * 7));
+  // startDate should be a Monday, and weeks run Monday-Sunday
+  let start: Date;
   
+  if (startDate) {
+    start = new Date(startDate);
+  } else {
+    // If no start date, use current Monday (shouldn't happen for active leagues)
+    const { getStartOfWeekMonday } = require('../utils/dates');
+    start = getStartOfWeekMonday(new Date());
+  }
+  
+  // Week 1 starts on startDate (Monday)
+  // Week N starts on startDate + (N-1) * 7 days
+  const weekStart = new Date(start.getTime() + ((weekNumber - 1) * 7 * 24 * 60 * 60 * 1000));
+  weekStart.setHours(0, 0, 0, 0);
+  
+  // Week ends on Sunday (6 days after Monday)
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
   
   return { start: weekStart, end: weekEnd };
 }

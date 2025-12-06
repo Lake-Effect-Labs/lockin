@@ -72,10 +72,17 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const leagues = await getUserLeaguesWithDetails(userId);
-      set({ leagues, isLoading: false });
+      set({ leagues, isLoading: false, error: null });
     } catch (error: any) {
       console.error('Fetch leagues error:', error);
-      set({ error: error.message, isLoading: false });
+      // Better error messages
+      let errorMessage = 'Failed to load leagues. Please try again.';
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      set({ error: errorMessage, isLoading: false });
     }
   },
 
@@ -129,11 +136,22 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
       // Refresh leagues list
       await get().fetchUserLeagues(userId);
       
-      set({ isLoading: false });
+      set({ isLoading: false, error: null });
     } catch (error: any) {
       console.error('Join league error:', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
+      // Better error messages
+      let errorMessage = error.message || 'Failed to join league. Please try again.';
+      if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
+        errorMessage = 'League not found. Please check the join code.';
+      } else if (error.message?.includes('already a member') || error.message?.includes('already joined')) {
+        errorMessage = 'You are already a member of this league.';
+      } else if (error.message?.includes('full') || error.message?.includes('maximum')) {
+        errorMessage = 'This league is full. The maximum number of players has been reached.';
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
     }
   },
 
@@ -172,11 +190,21 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
       set({ 
         currentLeague: dashboard.league,
         currentDashboard: dashboard, 
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
     } catch (error: any) {
       console.error('Fetch dashboard error:', error);
-      set({ error: error.message, isLoading: false });
+      // Better error messages
+      let errorMessage = 'Failed to load league. Please try again.';
+      if (error.message?.includes('not found')) {
+        errorMessage = 'League not found. It may have been deleted.';
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      set({ error: errorMessage, isLoading: false });
     }
   },
 

@@ -372,6 +372,11 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     throw new Error('You are already a member of this league');
   }
   
+  // Check if league has already started
+  if (league.start_date) {
+    throw new Error('This league has already started. You can only join leagues before they begin.');
+  }
+  
   // Check league capacity
   const { count } = await supabase
     .from('league_members')
@@ -391,10 +396,14 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     .eq('league_id', league.id);
   
   if (newCount && newCount >= league.max_players && !league.start_date) {
-    // League is now full, start it
+    // League is now full, start it on the next Monday
+    const { getNextMonday } = await import('../utils/dates');
+    const nextMonday = getNextMonday();
+    const startDate = nextMonday.toISOString().split('T')[0];
+    
     await supabase
       .from('leagues')
-      .update({ start_date: new Date().toISOString().split('T')[0] })
+      .update({ start_date: startDate })
       .eq('id', league.id);
     
     // Track analytics event
@@ -405,7 +414,9 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
       // Analytics not critical, continue
     }
     
-    // Generate matchups for week 1
+    // Generate matchups for week 1 (but don't start until Monday)
+    // Note: startLeagueSeason will be called when start_date arrives
+    // For now, we'll generate matchups but they won't be active until Monday
     await startLeagueSeason(league.id);
   }
   

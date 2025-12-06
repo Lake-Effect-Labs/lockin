@@ -80,7 +80,7 @@ export function getEndOfDay(date: Date = new Date()): Date {
 }
 
 /**
- * Get start of week (Sunday)
+ * Get start of week (Sunday) - legacy function
  */
 export function getStartOfWeek(date: Date = new Date()): Date {
   const d = new Date(date);
@@ -91,7 +91,56 @@ export function getStartOfWeek(date: Date = new Date()): Date {
 }
 
 /**
- * Get end of week (Saturday)
+ * Get start of week (Monday) - for leagues
+ */
+export function getStartOfWeekMonday(date: Date = new Date()): Date {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  // If it's Sunday (0), go back 6 days to get Monday
+  // Otherwise, go back (day - 1) days to get Monday
+  const daysToSubtract = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - daysToSubtract);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get end of week (Sunday) - for leagues (Monday-Sunday weeks)
+ */
+export function getEndOfWeekSunday(date: Date = new Date()): Date {
+  const weekStart = getStartOfWeekMonday(date);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6); // Sunday is 6 days after Monday
+  weekEnd.setHours(23, 59, 59, 999);
+  return weekEnd;
+}
+
+/**
+ * Get next Monday from a given date (or today if Monday, return next Monday)
+ */
+export function getNextMonday(fromDate: Date = new Date()): Date {
+  const nextMonday = getStartOfWeekMonday(fromDate);
+  // If today is already Monday, check if we want this Monday or next Monday
+  // For league start, if it's Monday and before noon, use today; otherwise next Monday
+  const today = new Date(fromDate);
+  const isMonday = today.getDay() === 1;
+  
+  if (isMonday) {
+    // If it's Monday, use next Monday (gives a full week to prepare)
+    nextMonday.setDate(nextMonday.getDate() + 7);
+  } else {
+    // If it's not Monday, get the next Monday
+    const day = today.getDay();
+    const daysToAdd = day === 0 ? 1 : 8 - day; // Sunday: +1, Tue-Sat: 8-day
+    nextMonday.setDate(today.getDate() + daysToAdd);
+  }
+  
+  nextMonday.setHours(0, 0, 0, 0);
+  return nextMonday;
+}
+
+/**
+ * Get end of week (Saturday) - legacy function
  */
 export function getEndOfWeek(date: Date = new Date()): Date {
   const d = new Date(date);

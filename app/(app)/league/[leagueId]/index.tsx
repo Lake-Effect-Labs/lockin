@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Share,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,11 +27,17 @@ import { SyncStatusIndicator, LiveIndicator } from '@/components/SyncStatusIndic
 import { SmartAdBanner } from '@/components/AdBanner';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 import { colors } from '@/utils/colors';
+import { WeeklyRecap } from '@/components/WeeklyRecap';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getMatchups, getWeeklyScore } from '@/services/supabase';
+import { getLeagueDashboard } from '@/services/league';
 
 // ============================================
 // LEAGUE DASHBOARD SCREEN
 // Main league view with matchup and standings
 // ============================================
+
+const LAST_WEEK_KEY_PREFIX = 'last_week_';
 
 export default function LeagueDashboardScreen() {
   const { leagueId } = useLocalSearchParams<{ leagueId: string }>();
@@ -43,10 +50,95 @@ export default function LeagueDashboardScreen() {
   const { opponentUpdate } = useMatchupSync(leagueId);
   
   const [refreshing, setRefreshing] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
+  const [recapData, setRecapData] = useState<any>(null);
   
   useEffect(() => {
     if (leagueId && user) {
       fetchDashboard(leagueId, user.id);
+      
+      // Check and process week end when dashboard loads
+      // This ensures weeks finalize automatically
+      const checkWeekEnd = async () => {
+        try {
+          const { checkWeekEnd } = useLeagueStore.getState();
+          
+          // Get previous week number before checking
+          const lastWeekKey = `${LAST_WEEK_KEY_PREFIX}${leagueId}`;
+          const lastWeekStr = await AsyncStorage.getItem(lastWeekKey);
+          const lastWeek = lastWeekStr ? parseInt(lastWeekStr, 10) : null;
+          
+          const weekAdvanced = await checkWeekEnd(leagueId);
+          
+          // Refresh dashboard after week check (in case week advanced)
+          if (weekAdvanced) {
+            await fetchDashboard(leagueId, user.id);
+            
+            // If week advanced and we have a previous week, show recap
+            if (lastWeek !== null && lastWeek > 0) {
+              // Get finalized matchup data for the previous week
+              try {
+                const allMatchups = await getMatchups(leagueId, lastWeek);
+                const previousMatchup = allMatchups.find(
+                  m => m.week_number === lastWeek &&
+                  (m.player1_id === user.id || m.player2_id === user.id) &&
+                  m.is_finalized
+                );
+                
+                if (previousMatchup) {
+                  const isPlayer1 = previousMatchup.player1_id === user.id;
+                  const opponentId = isPlayer1 
+                    ? previousMatchup.player2_id 
+                    : previousMatchup.player1_id;
+                  const opponentName = isPlayer1
+                    ? previousMatchup.player2?.username || 'Opponent'
+                    : previousMatchup.player1?.username || 'Opponent';
+                  
+                  const [userScoreData, opponentScoreData] = await Promise.all([
+                    getWeeklyScore(leagueId, user.id, lastWeek),
+                    getWeeklyScore(leagueId, opponentId, lastWeek),
+                  ]);
+                  
+                  // Get user's rank in standings
+                  const dashboard = await getLeagueDashboard(leagueId, user.id);
+                  const userStanding = dashboard.standings.findIndex(
+                    (s: any) => s.user_id === user.id
+                  );
+                  const userRank = userStanding >= 0 ? userStanding + 1 : dashboard.standings.length;
+                  
+                  setRecapData({
+                    weekNumber: lastWeek,
+                    matchup: previousMatchup,
+                    userScore: userScoreData,
+                    opponentScore: opponentScoreData,
+                    userRank,
+                    totalPlayers: dashboard.standings.length,
+                    leagueName: dashboard.league.name,
+                    scoringConfig: dashboard.league.scoring_config,
+                    opponentName,
+                    userName: user.username || 'You',
+                  });
+                  
+                  setShowRecap(true);
+                }
+              } catch (error) {
+                console.error('Error loading recap data:', error);
+              }
+            }
+          }
+          
+          // Update stored week number
+          if (currentDashboard?.league) {
+            await AsyncStorage.setItem(
+              lastWeekKey,
+              currentDashboard.league.current_week.toString()
+            );
+          }
+        } catch (error) {
+          // Silently fail - week check is not critical for display
+        }
+      };
+      checkWeekEnd();
     }
   }, [leagueId, user]);
   
@@ -189,7 +281,11 @@ Download Lock-In: https://lockin.app/download`;
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[500]} />
           <Text style={styles.loadingText}>Loading league...</Text>
+          {isLoading && (
+            <Text style={styles.loadingSubtext}>Fetching your matchup and standings...</Text>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -278,6 +374,19 @@ Download Lock-In: https://lockin.app/download`;
           style={styles.progressBar}
         />
         
+        {/* Playoff Explanation Banner */}
+        {isPlayoffs && !currentDashboard.playoffBracket && (
+          <View style={styles.playoffInfoBanner}>
+            <Ionicons name="trophy" size={24} color={colors.sport.gold} />
+            <View style={styles.playoffInfoContent}>
+              <Text style={styles.playoffInfoTitle}>Playoffs Started! 🏆</Text>
+              <Text style={styles.playoffInfoText}>
+                Top 4 players compete in semifinals, then finals. Check the Playoffs tab to see the bracket!
+              </Text>
+            </View>
+          </View>
+        )}
+        
         {/* Navigation Tabs */}
         <View style={styles.tabs}>
           <TouchableOpacity style={[styles.tab, styles.tabActive]}>
@@ -318,10 +427,17 @@ Download Lock-In: https://lockin.app/download`;
             <View style={styles.waitingContainer}>
               <Ionicons name="hourglass-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.waitingText}>
-                The league will start once {league.max_players} players have joined.
+                {members.length >= league.max_players 
+                  ? `League is full! Starting on ${league.start_date ? new Date(league.start_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'next Monday'}.`
+                  : `The league will start on the next Monday once ${league.max_players} players have joined.`}
               </Text>
               <Text style={styles.waitingSubtext}>
                 {members.length} of {league.max_players} players
+                {members.length >= league.max_players && league.start_date && (
+                  <Text style={styles.startDateText}>
+                    {'\n'}Starts: {new Date(league.start_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
+                )}
               </Text>
             </View>
           ) : currentMatchup ? (
@@ -337,10 +453,17 @@ Download Lock-In: https://lockin.app/download`;
                 onPress={() => router.push(`/(app)/league/${leagueId}/matchup`)}
               />
               {lastSyncedAt && (
-                <Text style={styles.lastSyncText}>
-                  Scores updated {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {isSyncing && ' • Syncing...'}
-                </Text>
+                <View style={styles.syncInfoContainer}>
+                  <Text style={styles.lastSyncText}>
+                    Scores updated {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {isSyncing && ' • Syncing...'}
+                  </Text>
+                  {daysRemaining > 0 && daysRemaining <= 2 && (
+                    <Text style={styles.weekEndWarning}>
+                      ⚠️ Week ends in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}! Make sure your data is synced.
+                    </Text>
+                  )}
+                </View>
               )}
             </>
           ) : (
@@ -386,6 +509,27 @@ Download Lock-In: https://lockin.app/download`;
               totalPoints={breakdown.totalPoints}
             />
           </View>
+        )}
+        
+        {/* Weekly Recap Modal */}
+        {recapData && (
+          <WeeklyRecap
+            visible={showRecap}
+            onClose={() => {
+              setShowRecap(false);
+              setRecapData(null);
+            }}
+            weekNumber={recapData.weekNumber}
+            matchup={recapData.matchup}
+            userScore={recapData.userScore}
+            opponentScore={recapData.opponentScore}
+            userRank={recapData.userRank}
+            totalPlayers={recapData.totalPlayers}
+            leagueName={recapData.leagueName}
+            scoringConfig={recapData.scoringConfig}
+            opponentName={recapData.opponentName}
+            userName={recapData.userName}
+          />
         )}
         
         {/* Admin Section */}
@@ -457,7 +601,14 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 16,
+  },
+  loadingSubtext: {
+    fontSize: 14,
     color: colors.text.secondary,
+    marginTop: 8,
   },
   scrollView: {
     flex: 1,
@@ -492,6 +643,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.secondary,
     marginTop: 2,
+  },
+  codeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  copyIcon: {
+    marginLeft: 4,
   },
   shareButton: {
     width: 40,
@@ -600,11 +760,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.primary,
   },
+  syncInfoContainer: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
   lastSyncText: {
     fontSize: 11,
     color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: 8,
+  },
+  weekEndWarning: {
+    fontSize: 12,
+    color: colors.status.warning,
+    textAlign: 'center',
+    marginTop: 6,
+    fontWeight: '600',
+  },
+  playoffInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.sport.gold + '20',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.sport.gold + '40',
+    gap: 12,
+  },
+  playoffInfoContent: {
+    flex: 1,
+  },
+  playoffInfoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  playoffInfoText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    lineHeight: 18,
   },
   seeAll: {
     fontSize: 14,
@@ -674,6 +869,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  startDateText: {
+    fontSize: 13,
+    color: colors.primary[500],
+    fontWeight: '600',
+    marginTop: 4,
+  },
   inviteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -687,7 +888,7 @@ const styles = StyleSheet.create({
   inviteButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: '#FFF',
   },
 });
 

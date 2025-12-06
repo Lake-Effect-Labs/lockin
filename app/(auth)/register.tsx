@@ -34,17 +34,24 @@ export default function RegisterScreen() {
   const handleSignUp = async () => {
     // Validation
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert('Missing Information', 'Please fill in all required fields');
+      return;
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
     
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Passwords Don\'t Match', 'Please make sure both password fields match');
       return;
     }
     
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert('Password Too Short', 'Password must be at least 6 characters long');
       return;
     }
     
@@ -80,7 +87,20 @@ export default function RegisterScreen() {
         );
       }
     } catch (err: any) {
-      Alert.alert('Sign Up Failed', err.message || 'Please try again');
+      // Better error messages
+      let errorMessage = 'Failed to create account. Please try again.';
+      if (err.message?.includes('already registered') || err.message?.includes('already exists')) {
+        errorMessage = 'An account with this email already exists. Please sign in instead.';
+      } else if (err.message?.includes('invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (err.message?.includes('password')) {
+        errorMessage = 'Password is too weak. Please choose a stronger password.';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      Alert.alert('Unable to Create Account', errorMessage);
     }
   };
   
@@ -240,19 +260,26 @@ export default function RegisterScreen() {
             {/* Sign Up Button */}
             <TouchableOpacity
               onPress={handleSignUp}
-              disabled={isLoading}
+              disabled={isLoading || !email || !password || !confirmPassword || password !== confirmPassword || password.length < 6}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={colors.gradients.primary}
+                colors={(isLoading || !email || !password || !confirmPassword || password !== confirmPassword || password.length < 6) 
+                  ? [colors.background.card, colors.background.elevated] 
+                  : colors.gradients.primary}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
+                style={[styles.primaryButton, (isLoading || !email || !password || !confirmPassword || password !== confirmPassword || password.length < 6) && styles.primaryButtonDisabled]}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.text.primary} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Create Account</Text>
+                  <Text style={[
+                    styles.primaryButtonText,
+                    (isLoading || !email || !password || !confirmPassword || password !== confirmPassword || password.length < 6) && styles.primaryButtonTextDisabled
+                  ]}>
+                    Create Account
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -368,6 +395,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
+  },
+  primaryButtonTextDisabled: {
+    color: colors.text.tertiary,
   },
   footer: {
     flexDirection: 'row',

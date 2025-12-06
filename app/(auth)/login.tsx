@@ -37,7 +37,17 @@ export default function LoginScreen() {
     if (!email || !password) {
       await sendLocalNotification({
         title: 'Sign In Failed',
-        body: 'Please enter email and password',
+        body: 'Please enter your email and password',
+      });
+      return;
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      await sendLocalNotification({
+        title: 'Invalid Email',
+        body: 'Please enter a valid email address',
       });
       return;
     }
@@ -51,10 +61,20 @@ export default function LoginScreen() {
         router.replace('/(app)/home');
       }
     } catch (err: any) {
-      // Show notification instead of alert
+      // Better error messages
+      let errorMessage = 'Invalid email or password. Please try again.';
+      if (err.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (err.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email address before signing in. Check your inbox.';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       await sendLocalNotification({
         title: 'Sign In Failed',
-        body: 'Invalid email or password. Please try again.',
+        body: errorMessage,
       });
     }
   };
@@ -201,22 +221,27 @@ export default function LoginScreen() {
             {/* Sign In Button */}
             <TouchableOpacity
               onPress={handleSignIn}
-              disabled={isLoading}
+              disabled={isLoading || !email || !password}
               activeOpacity={0.8}
               accessibilityLabel="Sign in"
               accessibilityRole="button"
-              accessibilityState={{ disabled: isLoading }}
+              accessibilityState={{ disabled: isLoading || !email || !password }}
             >
               <LinearGradient
-                colors={colors.gradients.primary}
+                colors={(isLoading || !email || !password) ? [colors.background.card, colors.background.elevated] : colors.gradients.primary}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
+                style={[styles.primaryButton, (isLoading || !email || !password) && styles.primaryButtonDisabled]}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.text.primary} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Sign In</Text>
+                  <Text style={[
+                    styles.primaryButtonText,
+                    (isLoading || !email || !password) && styles.primaryButtonTextDisabled
+                  ]}>
+                    Sign In
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -302,6 +327,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
+  },
+  primaryButtonTextDisabled: {
+    color: colors.text.tertiary,
   },
   footer: {
     flexDirection: 'row',

@@ -41,12 +41,12 @@ export default function JoinLeagueScreen() {
     const cleanCode = code.trim().toUpperCase();
     
     if (cleanCode.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-character code');
+      Alert.alert('Invalid Code', 'Please enter a valid 6-character join code');
       return;
     }
     
     if (!user) {
-      Alert.alert('Error', 'You must be logged in');
+      Alert.alert('Sign In Required', 'You must be signed in to join a league');
       return;
     }
     
@@ -54,7 +54,22 @@ export default function JoinLeagueScreen() {
       await joinLeague(cleanCode, user.id);
       setJoined(true);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to join league');
+      // Better error messages
+      let errorMessage = 'Failed to join league. Please try again.';
+      if (err.message?.includes('not found') || err.message?.includes('does not exist')) {
+        errorMessage = 'League not found. Please check the join code and try again.';
+      } else if (err.message?.includes('already a member') || err.message?.includes('already joined')) {
+        errorMessage = 'You are already a member of this league.';
+      } else if (err.message?.includes('full') || err.message?.includes('maximum')) {
+        errorMessage = 'This league is full. The maximum number of players has been reached.';
+      } else if (err.message?.includes('already started') || err.message?.includes('already begun')) {
+        errorMessage = 'This league has already started. You can only join leagues before they begin.';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      Alert.alert('Unable to Join League', errorMessage);
     }
   };
   
@@ -117,6 +132,12 @@ export default function JoinLeagueScreen() {
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.title}>Join League</Text>
+          <View style={styles.helpContainer}>
+            <Ionicons name="information-circle-outline" size={16} color={colors.text.tertiary} />
+            <Text style={styles.helpText}>
+              Get the 6-character code from the league creator
+            </Text>
+          </View>
             <View style={styles.placeholder} />
           </View>
           
@@ -128,7 +149,10 @@ export default function JoinLeagueScreen() {
             
             <Text style={styles.heading}>Enter Join Code</Text>
             <Text style={styles.description}>
-              Ask your friend for their league's 6-character code
+              Ask your friend for their league's 6-character code{'\n'}
+              <Text style={styles.descriptionHint}>
+                The code is usually 6 letters and numbers (e.g., ABC123)
+              </Text>
             </Text>
             
             {/* Code Input */}
@@ -152,10 +176,10 @@ export default function JoinLeagueScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={code.length === 6 ? colors.gradients.primary : [colors.background.card, colors.background.elevated]}
+                colors={code.length === 6 && !isLoading ? colors.gradients.primary : [colors.background.card, colors.background.elevated]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.joinButton}
+                style={[styles.joinButton, (isLoading || code.length !== 6) && styles.joinButtonDisabled]}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.text.primary} />
@@ -247,9 +271,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
+  descriptionHint: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontStyle: 'italic',
+  },
   codeInputContainer: {
     width: '100%',
     marginBottom: 24,
+  },
+  helpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.background.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  helpText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    flex: 1,
   },
   codeInput: {
     backgroundColor: colors.background.card,
@@ -279,6 +325,9 @@ const styles = StyleSheet.create({
   },
   joinButtonTextDisabled: {
     color: colors.text.tertiary,
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
   },
   successContent: {
     flex: 1,

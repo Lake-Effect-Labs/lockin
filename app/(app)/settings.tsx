@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Linking,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -16,6 +19,7 @@ import { useHealthStore } from '@/store/useHealthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { Avatar } from '@/components/Avatar';
 import { colors } from '@/utils/colors';
+import { initializeHealth, isHealthAvailable } from '@/services/health';
 
 // ============================================
 // SETTINGS SCREEN
@@ -24,7 +28,7 @@ import { colors } from '@/utils/colors';
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuthStore();
-  const { fakeMode, setFakeMode } = useHealthStore();
+  const { fakeMode, setFakeMode, isAvailable, requestPermissions, isLoading: healthLoading } = useHealthStore();
   const { notificationsEnabled, toggleNotifications } = useSettingsStore();
   
   const handleSignOut = () => {
@@ -115,6 +119,81 @@ export default function SettingsScreen() {
                 thumbColor={colors.text.primary}
               />
             </View>
+            
+            {/* HealthKit Permissions */}
+            {Platform.OS === 'ios' && !fakeMode && (
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <View style={[styles.settingIcon, { backgroundColor: (isAvailable ? colors.status.success : colors.status.warning) + '20' }]}>
+                    <Ionicons 
+                      name={isAvailable ? "heart" : "heart-outline"} 
+                      size={20} 
+                      color={isAvailable ? colors.status.success : colors.status.warning} 
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.settingLabel}>Health Data</Text>
+                    <Text style={styles.settingDescription}>
+                      {isAvailable ? 'Connected to Apple Health' : 'Not connected'}
+                    </Text>
+                  </View>
+                </View>
+                {!isAvailable && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (healthLoading) return;
+                      
+                      Alert.alert(
+                        'Enable Health Data',
+                        'Lock-In needs access to your Apple Health data to track your fitness metrics and compete in leagues.\n\nThis includes:\n• Steps\n• Sleep hours\n• Active calories\n• Workouts\n• Distance',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Open Settings',
+                            onPress: async () => {
+                              if (Platform.OS === 'ios') {
+                                Linking.openURL('app-settings:');
+                              }
+                            },
+                          },
+                          {
+                            text: 'Request Again',
+                            onPress: async () => {
+                              const granted = await requestPermissions();
+                              if (!granted) {
+                                Alert.alert(
+                                  'Permission Denied',
+                                  'To use Lock-In, please enable Health data access in Settings → Privacy → Health → Lock-In',
+                                  [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                      text: 'Open Settings',
+                                      onPress: () => {
+                                        if (Platform.OS === 'ios') {
+                                          Linking.openURL('app-settings:');
+                                        }
+                                      },
+                                    },
+                                  ]
+                                );
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                    style={styles.permissionButton}
+                    disabled={healthLoading}
+                  >
+                    {healthLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary[500]} />
+                    ) : (
+                      <Text style={styles.permissionButtonText}>Enable</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         </View>
         
@@ -385,6 +464,19 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
     marginTop: 16,
+  },
+  permissionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.primary[500] + '20',
+    borderWidth: 1,
+    borderColor: colors.primary[500],
+  },
+  permissionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary[500],
   },
 });
 

@@ -346,14 +346,12 @@ export async function getHealthDataRange(startDate: Date, endDate: Date): Promis
 }
 
 /**
- * Get weekly health data (current week)
+ * Get weekly health data (current week - Monday to today)
  */
 export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
+  const { getStartOfWeekMonday } = require('../utils/dates');
   const today = new Date();
-  const dayOfWeek = today.getDay();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - dayOfWeek);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const startOfWeek = getStartOfWeekMonday(today);
   
   return getHealthDataRange(startOfWeek, today);
 }

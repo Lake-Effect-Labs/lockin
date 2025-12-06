@@ -281,23 +281,48 @@ async function syncToAllLeagues(userId: string, metrics: FitnessMetrics): Promis
       if (!league.is_active) continue;
       
       const fullLeague = await getLeague(league.id);
-      if (!fullLeague) continue;
+      if (!fullLeague || !fullLeague.start_date) continue; // Skip leagues that haven't started
+      
+      // Get league-specific week date range
+      const { getWeekDateRange } = await import('./league');
+      const weekRange = getWeekDateRange(fullLeague.start_date, fullLeague.current_week);
+      
+      // Get health data for this specific league week (not calendar week!)
+      const { getHealthDataRange } = await import('./health');
+      const today = new Date();
+      const weekEnd = weekRange.end > today ? today : weekRange.end; // Don't fetch future dates
+      
+      let weekMetrics = metrics; // Default to aggregated metrics
+      
+      // If we can get league-specific data, use it
+      if (weekRange.start <= today) {
+        try {
+          const weekData = await getHealthDataRange(weekRange.start, weekEnd);
+          if (weekData.length > 0) {
+            const { aggregateWeeklyMetrics } = await import('./scoring');
+            weekMetrics = aggregateWeeklyMetrics(weekData);
+          }
+        } catch (error) {
+          console.warn(`Could not get league-specific health data for league ${league.id}, using aggregated metrics`);
+        }
+      }
       
       await upsertWeeklyScore(
         league.id,
         userId,
         fullLeague.current_week,
         {
-          steps: metrics.steps,
-          sleep_hours: metrics.sleepHours,
-          calories: metrics.calories,
-          workouts: metrics.workouts,
-          distance: metrics.distance,
+          steps: weekMetrics.steps,
+          sleep_hours: weekMetrics.sleepHours,
+          calories: weekMetrics.calories,
+          workouts: weekMetrics.workouts,
+          distance: weekMetrics.distance,
         }
       );
     }
   } catch (error) {
     console.error('Error syncing to leagues:', error);
+    // Don't throw - we want to continue syncing to other leagues
   }
 }
 
