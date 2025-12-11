@@ -17,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lockin.app",
+      "bundleIdentifier": "io.lockin.app",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In needs access to your health data to track your fitness metrics and compete in leagues.",
         "NSHealthUpdateUsageDescription": "Lock-In needs permission to update your health data.",

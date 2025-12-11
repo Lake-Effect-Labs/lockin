@@ -31,6 +31,14 @@ const ExpoSecureStoreAdapter = {
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
 
+// Validate Supabase credentials
+if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co' || 
+    !supabaseAnonKey || supabaseAnonKey === 'your-anon-key') {
+  console.error('⚠️ CRITICAL: Supabase credentials are missing or invalid!');
+  console.error('Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  // Don't throw here - let the app start and show error in UI
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,

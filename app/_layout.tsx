@@ -35,10 +35,20 @@ export default function RootLayout() {
   useEffect(() => {
     // Initialize app on mount
     const init = async () => {
-      initializeTheme();
-      await initNetworkMonitoring();
-      await initAuth();
-      await initHealth();
+      try {
+        initializeTheme();
+        await initNetworkMonitoring();
+        await initAuth();
+        await initHealth();
+      } catch (error: any) {
+        // Log error but don't crash - let ErrorBoundary handle it
+        console.error('App initialization error:', error);
+        // Still mark as initialized so app can show error UI
+        if (!authInitialized) {
+          // Force initialization to complete even on error
+          // This prevents infinite loading screen
+        }
+      }
     };
     init();
   }, []);

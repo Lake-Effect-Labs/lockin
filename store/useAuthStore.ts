@@ -56,6 +56,15 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
           
+          // Validate Supabase is configured
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+          const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+          
+          if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co' || 
+              !supabaseAnonKey || supabaseAnonKey === 'your-anon-key') {
+            throw new Error('Supabase credentials are not configured. Please check your environment variables.');
+          }
+          
           // Get current session
           const { data: { session } } = await supabase.auth.getSession();
           
