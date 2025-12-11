@@ -143,44 +143,30 @@ export default function SettingsScreen() {
                     onPress={async () => {
                       if (healthLoading) return;
                       
-                      Alert.alert(
-                        'Enable Health Data',
-                        'Lock-In needs access to your Apple Health data to track your fitness metrics and compete in leagues.\n\nThis includes:\n• Steps\n• Sleep hours\n• Active calories\n• Workouts\n• Distance',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Open Settings',
-                            onPress: async () => {
-                              if (Platform.OS === 'ios') {
-                                Linking.openURL('app-settings:');
-                              }
+                      // Directly request permissions - this will show the native iOS dialog
+                      const granted = await requestPermissions();
+                      
+                      if (!granted) {
+                        // If denied, show alert with option to open Settings
+                        Alert.alert(
+                          'Health Data Access Required',
+                          'Lock-In needs access to your Apple Health data to track your fitness metrics.\n\nPlease enable Health data access in:\nSettings → Privacy & Security → Health → Lock-In',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Open Settings',
+                              onPress: () => {
+                                if (Platform.OS === 'ios') {
+                                  // Try to open Health settings directly, fallback to app settings
+                                  Linking.openURL('x-apple-health://').catch(() => {
+                                    Linking.openURL('app-settings:');
+                                  });
+                                }
+                              },
                             },
-                          },
-                          {
-                            text: 'Request Again',
-                            onPress: async () => {
-                              const granted = await requestPermissions();
-                              if (!granted) {
-                                Alert.alert(
-                                  'Permission Denied',
-                                  'To use Lock-In, please enable Health data access in Settings → Privacy → Health → Lock-In',
-                                  [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                      text: 'Open Settings',
-                                      onPress: () => {
-                                        if (Platform.OS === 'ios') {
-                                          Linking.openURL('app-settings:');
-                                        }
-                                      },
-                                    },
-                                  ]
-                                );
-                              }
-                            },
-                          },
-                        ]
-                      );
+                          ]
+                        );
+                      }
                     }}
                     style={styles.permissionButton}
                     disabled={healthLoading}

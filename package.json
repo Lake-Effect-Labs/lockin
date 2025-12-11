@@ -63,9 +63,14 @@
     },
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": []
+        "exclude": [
+          "react-native-health"
+        ]
       }
     }
+  },
+  "overrides": {
+    "@expo/fingerprint": "0.15.4"
   },
   "private": true
 }

@@ -105,10 +105,18 @@ async function initializeAppleHealth(): Promise<boolean> {
     return new Promise((resolve) => {
       AppleHealthKit.initHealthKit(permissions, (error: any) => {
         if (error) {
-          console.error('HealthKit init error:', error);
-          resolve(false);
+          console.error('❌ HealthKit init error:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          // Still resolve true if it's a permission denial (user can change in Settings)
+          // Only resolve false if it's a real error
+          if (error.message?.includes('denied') || error.message?.includes('not authorized')) {
+            console.log('⚠️ HealthKit permissions denied - user can enable in Settings');
+            resolve(true); // Return true so app knows HealthKit is available, just needs permissions
+          } else {
+            resolve(false);
+          }
         } else {
-          console.log('HealthKit initialized successfully');
+          console.log('✅ HealthKit initialized successfully - permission dialog should have appeared');
           resolve(true);
         }
       });

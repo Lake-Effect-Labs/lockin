@@ -134,10 +134,13 @@ export const useHealthStore = create<HealthState>()(
         try {
           set({ isLoading: true, error: null });
           
+          console.log('🔵 Requesting HealthKit permissions...');
           const initialized = await initializeHealth();
+          console.log('🔵 HealthKit initialization result:', initialized);
           
           if (initialized) {
             const permissions = await checkHealthPermissions();
+            console.log('🔵 HealthKit permissions check:', permissions);
             set({ 
               isAvailable: true,
               permissions, 
@@ -146,11 +149,12 @@ export const useHealthStore = create<HealthState>()(
             return true;
           }
           
-          set({ isLoading: false });
+          console.log('⚠️ HealthKit initialization failed');
+          set({ isLoading: false, error: 'Failed to initialize HealthKit. Make sure you\'re using a development build, not Expo Go.' });
           return false;
         } catch (error: any) {
-          console.error('Request permissions error:', error);
-          set({ error: error.message, isLoading: false });
+          console.error('❌ Request permissions error:', error);
+          set({ error: error.message || 'Failed to request HealthKit permissions', isLoading: false });
           return false;
         }
       },
