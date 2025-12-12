@@ -287,8 +287,10 @@ export async function createLeague(
     points_per_mile?: number;
   } | null
 ): Promise<League> {
-  // Generate unique join code
-  const joinCode = generateJoinCode();
+  // Generate unique join code (already uppercase from generateJoinCode)
+  const joinCode = generateJoinCode().toUpperCase().trim();
+  
+  console.log(`📝 Creating league with join code: "${joinCode}"`);
   
   const { data, error } = await supabase
     .from('leagues')
