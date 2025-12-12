@@ -155,12 +155,26 @@ export async function getLeagueDashboard(
       }
       
       // Generate matchups for any missing weeks
+      // The generate_matchups function generates for the current week if matchups don't exist
+      // So we call it after each week finalization to generate the next week's matchups
       for (let week = league.current_week + 1; week <= actualWeek; week++) {
         const weekMatchups = allMatchups.filter(m => m.week_number === week);
         if (weekMatchups.length === 0 && week <= league.season_length_weeks) {
           console.log(`📋 Generating matchups for week ${week}...`);
           try {
+            // The generate_matchups function checks current_week and generates matchups for it
+            // So we need to update current_week first, then generate
+            const { supabase } = await import('./supabase');
+            const { error: updateError } = await supabase
+              .from('leagues')
+              .update({ current_week: week })
+              .eq('id', leagueId);
+            
+            if (updateError) throw updateError;
+            
+            // Generate matchups (will generate for current_week, which we just set)
             await startLeagueSeason(leagueId);
+            
             // Refresh matchups after generation
             allMatchups = await getMatchups(leagueId);
           } catch (error: any) {
@@ -168,6 +182,13 @@ export async function getLeagueDashboard(
           }
         }
       }
+      
+      // Ensure current_week is set to actualWeek after all processing
+      const { supabase } = await import('./supabase');
+      await supabase
+        .from('leagues')
+        .update({ current_week: actualWeek })
+        .eq('id', leagueId);
       
       // Refresh league to get updated current_week
       league = await getLeague(leagueId);
