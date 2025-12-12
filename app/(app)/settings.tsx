@@ -21,7 +21,6 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { Avatar } from '@/components/Avatar';
 import { colors } from '@/utils/colors';
 import { initializeHealth, isHealthAvailable } from '@/services/health';
-import Constants from 'expo-constants';
 
 // ============================================
 // SETTINGS SCREEN
