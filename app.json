@@ -50,7 +50,14 @@
         }
       ],
       "expo-background-fetch",
-      "expo-task-manager"
+      "expo-task-manager",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
+          "iosAppId": "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -12,6 +12,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { registerForPushNotifications } from '@/services/notifications';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { syncOnAppOpen } from '@/services/realtimeSync';
+import { initializeAdMob } from '@/services/ads';
 
 // ============================================
 // ROOT LAYOUT
@@ -40,6 +41,7 @@ export default function RootLayout() {
         await initNetworkMonitoring();
         await initAuth();
         await initHealth();
+        await initializeAdMob();
       } catch (error: any) {
         // Log error but don't crash - let ErrorBoundary handle it
         // Still mark as initialized so app can show error UI

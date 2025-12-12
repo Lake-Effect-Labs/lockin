@@ -34,7 +34,10 @@
       "distribution": "store",
       "ios": {
         "buildConfiguration": "Release",
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "cache": {
+          "disabled": true
+        }
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production"

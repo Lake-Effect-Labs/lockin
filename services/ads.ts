@@ -5,6 +5,9 @@
 // ============================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 export interface AdConfig {
   enabled: boolean;
@@ -27,6 +30,58 @@ const DEFAULT_CONFIG: AdConfig = {
     standings: 0.3, // 30% chance
   },
 };
+
+/**
+ * Initialize AdMob SDK
+ */
+export async function initializeAdMob(): Promise<void> {
+  try {
+    // Set up AdMob with appropriate content rating
+    await mobileAds().setRequestConfiguration({
+      // Maximum ad content rating for family-friendly content
+      maxAdContentRating: MaxAdContentRating.PG,
+      // Enable test devices in development
+      testDeviceIdentifiers: __DEV__ ? ['EMULATOR'] : [],
+    });
+
+    // Initialize AdMob
+    await mobileAds().initialize();
+
+    console.log('✅ AdMob initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize AdMob:', error);
+  }
+}
+
+/**
+ * Get the appropriate AdMob app ID for the current platform
+ */
+export function getAdMobAppId(): string | null {
+  const config = Constants.expoConfig?.extra;
+
+  if (Platform.OS === 'ios') {
+    return config?.EXPO_PUBLIC_ADMOB_IOS_APP_ID || null;
+  } else {
+    return config?.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID || null;
+  }
+}
+
+/**
+ * Get ad unit ID for banner ads
+ */
+export function getBannerAdUnitId(): string {
+  if (__DEV__) {
+    return mobileAds.TestIds.BANNER;
+  }
+
+  const config = Constants.expoConfig?.extra;
+
+  if (Platform.OS === 'ios') {
+    return config?.EXPO_PUBLIC_ADMOB_BANNER_IOS || mobileAds.TestIds.BANNER;
+  } else {
+    return config?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID || mobileAds.TestIds.BANNER;
+  }
+}
 
 /**
  * Check if ad should be shown based on frequency capping

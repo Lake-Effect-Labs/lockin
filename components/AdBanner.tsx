@@ -1,7 +1,7 @@
 // ============================================
 // AD BANNER COMPONENT
 // Lock-In Fitness Competition App
-// Dismissible, non-intrusive ad banner
+// Dismissible, non-intrusive ad banner with AdMob integration
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -11,38 +11,35 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { colors } from '@/utils/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Mock ad component for now (replace with real ad SDK when ready)
+import Constants from 'expo-constants';
 interface AdBannerProps {
   unitId?: string;
   style?: any;
   onAdLoaded?: () => void;
   onAdFailedToLoad?: (error: any) => void;
+  size?: BannerAdSize;
 }
 
-export function AdBanner({ 
-  unitId, 
+export function AdBanner({
+  unitId,
   style,
   onAdLoaded,
-  onAdFailedToLoad 
+  onAdFailedToLoad,
+  size = BannerAdSize.BANNER
 }: AdBannerProps) {
   const [isVisible, setIsVisible] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
   const [adDismissedToday, setAdDismissedToday] = useState(false);
-  
+
   useEffect(() => {
     checkAdDismissedToday();
-    // Simulate ad loading
-    setTimeout(() => {
-      setIsLoading(false);
-      onAdLoaded?.();
-    }, 500);
   }, []);
-  
+
   const checkAdDismissedToday = async () => {
     try {
       const lastDismissed = await AsyncStorage.getItem('ad_last_dismissed_date');
@@ -55,7 +52,7 @@ export function AdBanner({
       // Ignore
     }
   };
-  
+
   const handleDismiss = async () => {
     try {
       const today = new Date().toDateString();
@@ -65,39 +62,46 @@ export function AdBanner({
       setIsVisible(false);
     }
   };
-  
+
+  // Get the ad unit ID - use test ID if not provided or in development
+  const getAdUnitId = () => {
+    if (unitId) return unitId;
+    if (__DEV__) return TestIds.BANNER;
+
+    // Production: use environment variables
+    const envVar = Platform.OS === 'ios'
+      ? Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_IOS
+      : Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID;
+
+    return envVar || TestIds.BANNER;
+  };
+
   if (!isVisible || adDismissedToday) {
     return null;
   }
-  
+
   return (
     <View style={[styles.container, style]}>
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={colors.text.tertiary} />
+      <View style={styles.adContent}>
+        <View style={styles.adLabel}>
+          <Text style={styles.adLabelText}>Ad</Text>
         </View>
-      ) : (
-        <>
-          <View style={styles.adContent}>
-            <View style={styles.adLabel}>
-              <Text style={styles.adLabelText}>Ad</Text>
-            </View>
-            <View style={styles.adPlaceholder}>
-              <Ionicons name="megaphone-outline" size={24} color={colors.text.tertiary} />
-              <Text style={styles.adPlaceholderText}>
-                Advertisement
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={handleDismiss}
-            style={styles.dismissButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close" size={18} color={colors.text.secondary} />
-          </TouchableOpacity>
-        </>
-      )}
+        <View style={styles.adWrapper}>
+          <BannerAd
+            unitId={getAdUnitId()}
+            size={size}
+            onAdLoaded={onAdLoaded}
+            onAdFailedToLoad={onAdFailedToLoad}
+          />
+        </View>
+      </View>
+      <TouchableOpacity
+        onPress={handleDismiss}
+        style={styles.dismissButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="close" size={18} color={colors.text.secondary} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -164,8 +168,7 @@ export function SmartAdBanner({ placement, style, forceShow = false }: SmartAdBa
   }
   
   return (
-    <AdBanner 
-      unitId={`ca-app-pub-3940256099942544/6300978111`} // Test ad unit ID
+    <AdBanner
       style={style}
     />
   );
@@ -182,13 +185,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 80,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 60,
   },
   adContent: {
     flex: 1,
@@ -208,16 +204,9 @@ const styles = StyleSheet.create({
     color: colors.primary[500],
     textTransform: 'uppercase',
   },
-  adPlaceholder: {
+  adWrapper: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  adPlaceholderText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontStyle: 'italic',
   },
   dismissButton: {
     padding: 4,

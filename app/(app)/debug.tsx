@@ -184,6 +184,40 @@ export default function DebugScreen() {
       Alert.alert('Error', `Failed to get diagnostics: ${error.message}`);
     }
   };
+
+  const runHealthKitSanityCheck = async () => {
+    try {
+      const diagnostics = await getHealthKitDiagnostics();
+
+      let status = '❌ FAILED';
+      let message = 'HealthKit is not working properly';
+
+      if (diagnostics.moduleLoaded && diagnostics.deviceSupported) {
+        status = '✅ PASSED';
+        message = 'HealthKit is properly configured and ready to request permissions';
+      } else if (!diagnostics.moduleLoaded) {
+        message = 'CRITICAL: react-native-health module not included in build. Do clean rebuild with --clear-cache';
+      } else if (!diagnostics.deviceSupported) {
+        message = 'Device compatibility issue. Test on iPhone 6s+ with iOS 11+';
+      }
+
+      Alert.alert(
+        `🏥 HealthKit Sanity Check: ${status}`,
+        `Platform: ${diagnostics.platform}\n` +
+        `Bundle ID: ${diagnostics.bundleId}\n` +
+        `Module Loaded: ${diagnostics.moduleLoaded ? '✅ YES' : '❌ NO'}\n` +
+        `Device Supported: ${diagnostics.deviceSupported ? '✅ YES' : '❌ NO'}\n` +
+        `Expo Go: ${diagnostics.isExpoGo ? '❌ BAD' : '✅ GOOD'}\n\n` +
+        `${message}\n\n` +
+        `Next Steps:\n` +
+        `1. If FAILED: Rebuild with --clear-cache\n` +
+        `2. Open app and trigger HealthKit permission request\n` +
+        `3. Check Settings → Privacy → Health for Lock-In app`
+      );
+    } catch (error: any) {
+      Alert.alert('❌ Sanity Check Error', `Failed to run HealthKit check: ${error.message}`);
+    }
+  };
   
   const runWeeklySimulationInteractive = async () => {
     setIsSimulating(true);
@@ -387,6 +421,15 @@ export default function DebugScreen() {
           >
             <Ionicons name="information-circle" size={20} color={colors.primary[500]} />
             <Text style={styles.secondaryText}>HealthKit Diagnostics</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={runHealthKitSanityCheck}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="medkit" size={20} color={colors.status.success} />
+            <Text style={styles.secondaryText}>HealthKit Sanity Check</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
