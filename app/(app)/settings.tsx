@@ -252,7 +252,7 @@ export default function SettingsScreen() {
             <TouchableOpacity 
               style={styles.settingItem}
               onPress={async () => {
-                const privacyUrl = 'https://lockin.app/privacy'; // Update with your actual URL
+                const privacyUrl = 'https://lock-in.github.io/'; // Update if using different URL
                 try {
                   const supported = await Linking.canOpenURL(privacyUrl);
                   if (supported) {
