@@ -126,33 +126,48 @@ export function EmptyLeagueCard({ type, onPress }: EmptyLeagueCardProps) {
   return (
     <TouchableOpacity 
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
       style={styles.emptyContainer}
       accessibilityLabel={isCreate ? 'Create a new league' : 'Join an existing league'}
       accessibilityRole="button"
       accessibilityHint={isCreate ? 'Opens the create league screen' : 'Opens the join league screen'}
     >
-      <View style={styles.emptyContent}>
-        <View style={[
-          styles.emptyIcon,
-          { backgroundColor: isCreate ? colors.primary[500] + '20' : colors.secondary[500] + '20' }
-        ]}>
-          <Ionicons 
-            name={isCreate ? 'add-circle' : 'enter-outline'} 
-            size={32} 
-            color={isCreate ? colors.primary[500] : colors.secondary[500]} 
-          />
+      <LinearGradient
+        colors={isCreate 
+          ? [colors.primary[500] + '15', colors.primary[500] + '05']
+          : [colors.secondary[500] + '15', colors.secondary[500] + '05']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.emptyGradient}
+      >
+        <View style={styles.emptyContent}>
+          <LinearGradient
+            colors={isCreate 
+              ? colors.gradients.primary
+              : [colors.secondary[500], colors.secondary[600]]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.emptyIcon}
+          >
+            <Ionicons 
+              name={isCreate ? 'add-circle' : 'enter-outline'} 
+              size={28} 
+              color={colors.text.primary} 
+            />
+          </LinearGradient>
+          <Text style={styles.emptyTitle}>
+            {isCreate ? 'Create League' : 'Join League'}
+          </Text>
+          <Text style={styles.emptyDescription}>
+            {isCreate 
+              ? 'Start a new league and invite friends'
+              : 'Enter a code to join an existing league'
+            }
+          </Text>
         </View>
-        <Text style={styles.emptyTitle}>
-          {isCreate ? 'Create League' : 'Join League'}
-        </Text>
-        <Text style={styles.emptyDescription}>
-          {isCreate 
-            ? 'Start a new league and invite friends'
-            : 'Enter a code to join an existing league'
-          }
-        </Text>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
@@ -246,12 +261,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyContainer: {
-    backgroundColor: colors.background.card,
     borderRadius: 20,
-    borderWidth: 1,
+    overflow: 'hidden',
+    borderWidth: 2,
     borderColor: colors.border.default,
-    padding: 20,
-    minHeight: 140,
+    minHeight: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyGradient: {
+    flex: 1,
+    padding: 24,
   },
   emptyContent: {
     alignItems: 'center',
@@ -259,23 +282,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   emptyDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.text.secondary,
     textAlign: 'center',
+    lineHeight: 18,
   },
 });
 
