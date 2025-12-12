@@ -216,19 +216,30 @@ export async function getLeagueDashboard(
   }
   
   // Calculate days remaining
-  // If league hasn't started yet, show days until start
-  // If league has started, show days remaining in current week
+  // If league hasn't started yet (start_date is in the future), show days until start
+  // If league has started (start_date is today or in the past), show days remaining in current week
   let daysRemaining = 0;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Normalize to start of day
+  
   if (!league.start_date) {
-    // League hasn't started - show days until next Monday
+    // League hasn't been scheduled - show days until next Monday
     const { getNextMonday } = require('../utils/dates');
     const nextMonday = getNextMonday();
-    const now = new Date();
     const diffTime = nextMonday.getTime() - now.getTime();
     daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   } else {
-    // League has started - show days remaining in current week
-    daysRemaining = calculateDaysRemainingInWeek(league.start_date, currentWeek);
+    const startDate = new Date(league.start_date);
+    startDate.setHours(0, 0, 0, 0); // Normalize to start of day
+    
+    if (startDate > now) {
+      // League is scheduled but hasn't started yet - show days until start
+      const diffTime = startDate.getTime() - now.getTime();
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    } else {
+      // League has started - show days remaining in current week
+      daysRemaining = calculateDaysRemainingInWeek(league.start_date, currentWeek);
+    }
   }
   
   // Build playoff bracket if in playoffs
