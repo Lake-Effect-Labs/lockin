@@ -35,18 +35,15 @@ BEGIN
     SELECT season_length_weeks INTO season_length
     FROM leagues WHERE id = p_league_id;
     
-    -- Get the highest week number that already has matchups
-    SELECT COALESCE(MAX(week_number), 0) INTO week
-    FROM matchups
-    WHERE league_id = p_league_id;
+    -- Get the current week from the league
+    SELECT current_week INTO week
+    FROM leagues
+    WHERE id = p_league_id;
     
-    -- Start generating from the next week
-    week := week + 1;
-    
-    -- Only generate matchups for weeks that don't exist yet
-    -- and are within the season length
-    IF week > season_length THEN
-        RETURN; -- Season is over
+    -- Generate matchups for the current week if it doesn't exist
+    -- This handles auto-advancement scenarios where week advanced but matchups weren't generated
+    IF week IS NULL OR week < 1 OR week > season_length THEN
+        RETURN; -- Invalid week or season is over
     END IF;
     
     -- If odd number, add a "bye" placeholder (NULL)
@@ -58,7 +55,12 @@ BEGIN
     -- Initialize last opponents array (track opponent for each player)
     last_opponents := ARRAY(SELECT NULL::UUID FROM generate_series(1, member_count));
     
-    -- Generate matchups for the next week only
+    -- Check if matchups already exist for this week
+    IF EXISTS (SELECT 1 FROM matchups WHERE league_id = p_league_id AND week_number = week) THEN
+        RETURN; -- Matchups already exist for this week
+    END IF;
+    
+    -- Generate matchups for the current week
     rotated := members;
     
     -- Get last week's opponents to avoid repeats
