@@ -14,11 +14,7 @@ DECLARE
     rotated UUID[];
     home_idx INTEGER;
     away_idx INTEGER;
-    last_opponents UUID[]; -- Track last opponent for each player
-    current_opponent UUID;
     valid_pairing BOOLEAN;
-    attempts INTEGER;
-    max_attempts INTEGER;
 BEGIN
     -- Get all members
     SELECT ARRAY_AGG(user_id ORDER BY joined_at) INTO members
@@ -52,9 +48,6 @@ BEGIN
         member_count := member_count + 1;
     END IF;
     
-    -- Initialize last opponents array (track opponent for each player)
-    last_opponents := ARRAY(SELECT NULL::UUID FROM generate_series(1, member_count));
-    
     -- Check if matchups already exist for this week
     IF EXISTS (SELECT 1 FROM matchups WHERE league_id = p_league_id AND week_number = week) THEN
         RETURN; -- Matchups already exist for this week
@@ -62,25 +55,6 @@ BEGIN
     
     -- Generate matchups for the current week
     rotated := members;
-    
-    -- Get last week's opponents to avoid repeats
-    IF week > 1 THEN
-        FOR i IN 1..member_count LOOP
-            IF members[i] IS NOT NULL THEN
-                -- Find who this player faced last week
-                SELECT CASE 
-                    WHEN player1_id = members[i] THEN player2_id
-                    WHEN player2_id = members[i] THEN player1_id
-                    ELSE NULL
-                END INTO last_opponents[i]
-                FROM matchups
-                WHERE league_id = p_league_id 
-                    AND week_number = week - 1
-                    AND (player1_id = members[i] OR player2_id = members[i])
-                LIMIT 1;
-            END IF;
-        END LOOP;
-    END IF;
     
     -- Use round-robin rotation, but ensure no repeat opponents
     -- Rotate based on week number (standard round-robin)
@@ -97,47 +71,45 @@ BEGIN
         
         -- Skip if either is NULL (bye week)
         IF rotated[home_idx] IS NOT NULL AND rotated[away_idx] IS NOT NULL THEN
-            -- Check if this pairing would be a repeat
+            -- Check if this pairing would be a repeat (faced each other last week)
             valid_pairing := true;
             
-            -- Check if home player faced away player last week
-            FOR j IN 1..member_count LOOP
-                IF members[j] = rotated[home_idx] AND last_opponents[j] = rotated[away_idx] THEN
+            IF week > 1 THEN
+                -- Check if these two players faced each other last week
+                SELECT COUNT(*) INTO j
+                FROM matchups
+                WHERE league_id = p_league_id 
+                    AND week_number = week - 1
+                    AND (
+                        (player1_id = rotated[home_idx] AND player2_id = rotated[away_idx])
+                        OR (player1_id = rotated[away_idx] AND player2_id = rotated[home_idx])
+                    );
+                
+                IF j > 0 THEN
                     valid_pairing := false;
-                    EXIT;
-                END IF;
-                IF members[j] = rotated[away_idx] AND last_opponents[j] = rotated[home_idx] THEN
-                    valid_pairing := false;
-                    EXIT;
-                END IF;
-            END LOOP;
-            
-            -- If repeat, try swapping with adjacent pairings
-            IF NOT valid_pairing AND i < (member_count / 2) THEN
-                -- Try swapping away_idx with next pairing's away_idx
-                IF rotated[member_count - i] IS NOT NULL THEN
-                    -- Check if swap would avoid repeat
-                    valid_pairing := true;
-                    FOR j IN 1..member_count LOOP
-                        IF members[j] = rotated[home_idx] AND last_opponents[j] = rotated[member_count - i] THEN
-                            valid_pairing := false;
-                            EXIT;
-                        END IF;
-                        IF members[j] = rotated[member_count - i] AND last_opponents[j] = rotated[home_idx] THEN
-                            valid_pairing := false;
-                            EXIT;
-                        END IF;
-                    END LOOP;
                     
-                    IF valid_pairing THEN
-                        -- Swap
-                        away_idx := member_count - i;
+                    -- Try swapping with adjacent pairings to avoid repeat
+                    IF i < (member_count / 2) AND rotated[member_count - i] IS NOT NULL THEN
+                        -- Check if swap would avoid repeat
+                        SELECT COUNT(*) INTO j
+                        FROM matchups
+                        WHERE league_id = p_league_id 
+                            AND week_number = week - 1
+                            AND (
+                                (player1_id = rotated[home_idx] AND player2_id = rotated[member_count - i])
+                                OR (player1_id = rotated[member_count - i] AND player2_id = rotated[home_idx])
+                            );
+                        
+                        IF j = 0 THEN
+                            valid_pairing := true;
+                            -- Swap
+                            away_idx := member_count - i;
+                        END IF;
                     END IF;
                 END IF;
             END IF;
             
-            -- Insert matchup if valid (or if we couldn't avoid repeat, insert anyway)
-            -- This handles edge cases where avoiding repeats is impossible
+            -- Insert matchup (even if repeat - handles edge cases where avoiding repeats is impossible)
             INSERT INTO matchups (league_id, week_number, player1_id, player2_id)
             VALUES (p_league_id, week, rotated[home_idx], rotated[away_idx])
             ON CONFLICT DO NOTHING;
