@@ -1,0 +1,3 @@
+# Netlify redirects for join links
+/join/:code https://lockin.app/join.html?code=:code&name=League
+

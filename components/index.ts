@@ -10,4 +10,5 @@ export { OfflineBanner } from './OfflineBanner';
 export { SyncStatusIndicator, LiveIndicator, LastUpdated } from './SyncStatusIndicator';
 export { NetworkErrorBanner } from './NetworkErrorBanner';
 export { WeeklyRecap } from './WeeklyRecap';
+export { InviteWidget } from './InviteWidget';
 

@@ -111,23 +111,15 @@ export default function CreateLeagueScreen() {
     
     const joinCode = createdLeague.join_code;
     const leagueName = createdLeague.name;
-    const deepLink = `lockin://join?code=${joinCode}`;
     
-    // Create a nice invitation message
-    const invitationMessage = `🏆 Join my Lock-In fitness league!
+    // Simple share message
+    const shareMessage = `Join my Lock-In fitness league: "${leagueName}"
 
-"${leagueName}"
-
-Join Code: ${joinCode}
-
-Tap to join: ${deepLink}
-
-Download Lock-In: https://lockin.app/download`;
-
+Join Code: ${joinCode}`;
+    
     try {
       await Share.share({
-        message: invitationMessage,
-        url: deepLink, // iOS will use this for universal links
+        message: shareMessage,
       });
     } catch (err) {
       console.error('Share error:', err);
@@ -154,26 +146,27 @@ Download Lock-In: https://lockin.app/download`;
           <Text style={styles.successTitle}>League Created!</Text>
           <Text style={styles.successSubtitle}>{createdLeague.name}</Text>
           
-          <View style={styles.codeCard}>
-            <Text style={styles.codeLabel}>Share this code with friends</Text>
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteText}>
+              Share this code with friends to join your league
+            </Text>
             <TouchableOpacity 
               onPress={handleCopyCode}
-              style={styles.codeValueContainer}
+              style={styles.codeCard}
               activeOpacity={0.7}
             >
               <Text style={styles.codeValue}>{createdLeague.join_code}</Text>
-              <Ionicons name="copy-outline" size={18} color={colors.primary[500]} style={styles.copyIcon} />
+              <Ionicons name="copy-outline" size={20} color={colors.primary[500]} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleShare}
+              style={styles.shareButton}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="share-outline" size={18} color={colors.text.primary} />
+              <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity
-            onPress={handleShare}
-            style={styles.shareButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="share-outline" size={20} color={colors.primary[500]} />
-            <Text style={styles.shareButtonText}>Share Invite</Text>
-          </TouchableOpacity>
           
           <TouchableOpacity
             onPress={handleDone}
@@ -686,15 +679,29 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: 32,
   },
+  inviteCard: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  inviteText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
   codeCard: {
     backgroundColor: colors.background.card,
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: colors.primary[500],
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    marginBottom: 24,
+    justifyContent: 'center',
+    gap: 12,
     width: '100%',
+    marginBottom: 16,
   },
   codeLabel: {
     fontSize: 14,
@@ -706,11 +713,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   codeValue: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     color: colors.primary[500],
     letterSpacing: 4,
-    marginRight: 8,
+    flex: 1,
+    textAlign: 'center',
   },
   copyIcon: {
     marginLeft: 4,

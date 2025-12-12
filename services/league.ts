@@ -308,6 +308,17 @@ export async function processWeekEnd(leagueId: string): Promise<boolean> {
   // Finalize the week (this advances current_week by 1)
   await finalizeWeek(leagueId, currentWeek);
   
+  // Verify matchups exist for the new week (they should have been generated at league start)
+  // But if they don't exist (e.g., demo league wasn't seeded properly), generate them
+  const { getMatchups, startLeagueSeason } = await import('./supabase');
+  const newWeekMatchups = await getMatchups(leagueId, nextWeek);
+  if (newWeekMatchups.length === 0 && nextWeek <= league.season_length_weeks) {
+    console.log(`No matchups found for week ${nextWeek}, generating them...`);
+    // Matchups should already exist, but if they don't, generate them
+    // This can happen if the league wasn't seeded properly
+    await startLeagueSeason(leagueId);
+  }
+  
   // Check if playoffs should start (after week advancement)
   if (shouldStartPlayoffsAfterFinalization) {
     try {

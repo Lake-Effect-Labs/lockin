@@ -166,6 +166,9 @@ export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: 'lockin://auth/callback', // Use app deep link instead of localhost
+    },
   });
   if (error) throw error;
   // Return both user and session - session will be null if email confirmation is required
@@ -365,8 +368,22 @@ export async function joinLeague(leagueId: string, userId: string): Promise<Leag
 }
 
 export async function joinLeagueByCode(joinCode: string, userId: string): Promise<LeagueMember> {
-  const league = await getLeagueByCode(joinCode);
-  if (!league) throw new Error('League not found');
+  // Normalize join code to uppercase
+  const normalizedCode = joinCode.trim().toUpperCase();
+  
+  if (normalizedCode.length !== 6) {
+    throw new Error('Invalid join code. Join codes must be 6 characters.');
+  }
+  
+  console.log(`🔍 Looking up league with join code: ${normalizedCode}`);
+  const league = await getLeagueByCode(normalizedCode);
+  
+  if (!league) {
+    console.error(`❌ League not found for join code: ${normalizedCode}`);
+    throw new Error('League not found. Please check the join code and try again.');
+  }
+  
+  console.log(`✅ Found league: ${league.name} (${league.id})`);
   
   // Check if already a member
   const existingMember = await supabase

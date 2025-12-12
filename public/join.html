@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Lock-In League</title>
+    
+    <!-- Open Graph / Facebook / Twitter -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lockin.app/join/">
+    <meta property="og:title" content="Join My Lock-In Fitness League!">
+    <meta property="og:description" content="Compete in weekly fitness matchups. Track steps, sleep, workouts, and more!">
+    <meta property="og:image" content="https://lockin.app/og-image.png">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://lockin.app/join/">
+    <meta name="twitter:title" content="Join My Lock-In Fitness League!">
+    <meta name="twitter:description" content="Compete in weekly fitness matchups. Track steps, sleep, workouts, and more!">
+    <meta name="twitter:image" content="https://lockin.app/og-image.png">
+    
+    <!-- Apple iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0A0A0F 0%, #1A1A2E 100%);
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            color: #FFFFFF;
+        }
+        
+        .league-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #FF6B35;
+            margin-bottom: 24px;
+        }
+        
+        .code {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 107, 53, 0.5);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        
+        .code-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+        
+        .code-value {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: 4px;
+            color: #FFFFFF;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 16px;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 24px;
+            transition: transform 0.2s;
+        }
+        
+        .button:hover {
+            transform: scale(1.05);
+        }
+        
+        .button:active {
+            transform: scale(0.95);
+        }
+        
+        .fallback {
+            margin-top: 24px;
+            font-size: 14px;
+            color: #999;
+        }
+        
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #FF6B35;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🏆</div>
+        <h1>Join My Lock-In League!</h1>
+        <div class="league-name" id="leagueName">Loading...</div>
+        
+        <div class="code">
+            <div class="code-label">Join Code</div>
+            <div class="code-value" id="joinCode">...</div>
+        </div>
+        
+        <div class="spinner" id="spinner"></div>
+        
+        <div class="fallback" id="fallback" style="display: none;">
+            <p>Don't have the app?</p>
+            <p>Download Lock-In from the App Store to compete!</p>
+        </div>
+    </div>
+    
+    <script>
+        // Get code from URL path: /join/ABC123
+        const path = window.location.pathname;
+        const codeMatch = path.match(/\/join\/([A-Z0-9]{6})/i);
+        const code = codeMatch ? codeMatch[1].toUpperCase() : null;
+        
+        // Get league name from query param if available
+        const urlParams = new URLSearchParams(window.location.search);
+        const leagueName = urlParams.get('name') || 'My League';
+        
+        if (code) {
+            document.getElementById('joinCode').textContent = code;
+            document.getElementById('leagueName').textContent = `"${leagueName}"`;
+            
+            // Update Open Graph tags dynamically
+            const currentUrl = window.location.href;
+            document.getElementById('og-url').setAttribute('content', currentUrl);
+            document.getElementById('og-title').setAttribute('content', `Join "${leagueName}" on Lock-In!`);
+            document.getElementById('og-description').setAttribute('content', `Join Code: ${code}. Compete in weekly fitness matchups!`);
+            
+            // Try to open the app
+            const deepLink = `lockin://join?code=${code}`;
+            
+            // Try to open app (will redirect if app is installed)
+            window.location.href = deepLink;
+            
+            // Fallback: Show message after delay
+            setTimeout(() => {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('fallback').style.display = 'block';
+            }, 2000);
+        } else {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('fallback').style.display = 'block';
+            document.getElementById('fallback').innerHTML = '<p>Invalid invite link</p>';
+        }
+    </script>
+</body>
+</html>
+

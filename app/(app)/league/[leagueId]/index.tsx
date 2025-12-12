@@ -174,23 +174,15 @@ export default function LeagueDashboardScreen() {
     
     const joinCode = currentDashboard.league.join_code;
     const leagueName = currentDashboard.league.name;
-    const deepLink = `lockin://join?code=${joinCode}`;
     
-    // Create a nice invitation message
-    const invitationMessage = `🏆 Join my Lock-In fitness league!
+    // Simple share message
+    const shareMessage = `Join my Lock-In fitness league: "${leagueName}"
 
-"${leagueName}"
-
-Join Code: ${joinCode}
-
-Tap to join: ${deepLink}
-
-Download Lock-In: https://lockin.app/download`;
-
+Join Code: ${joinCode}`;
+    
     try {
       await Share.share({
-        message: invitationMessage,
-        url: deepLink, // iOS will use this for universal links
+        message: shareMessage,
       });
     } catch (err) {
       console.error('Share error:', err);
@@ -475,14 +467,16 @@ Download Lock-In: https://lockin.app/download`;
                   ? "You're the only player in this league. Invite friends to start competing!"
                   : "Waiting for matchups to be generated. The season will start once there are enough players."}
               </Text>
-              {standings.length === 1 && (
-                <TouchableOpacity
-                  onPress={handleShare}
-                  style={styles.inviteButton}
-                >
-                  <Ionicons name="share-outline" size={18} color={colors.text.primary} />
-                  <Text style={styles.inviteButtonText}>Share League Code</Text>
-                </TouchableOpacity>
+              {standings.length < league.max_players && (
+                <View style={styles.inviteWidgetContainer}>
+                  <InviteWidget
+                    leagueName={league.name}
+                    joinCode={league.join_code}
+                    onCopy={handleCopyCode}
+                    onShare={handleShare}
+                    compact
+                  />
+                </View>
               )}
             </View>
           )}
@@ -874,6 +868,10 @@ const styles = StyleSheet.create({
     color: colors.primary[500],
     fontWeight: '600',
     marginTop: 4,
+  },
+  inviteWidgetContainer: {
+    width: '100%',
+    marginTop: 20,
   },
   inviteButton: {
     flexDirection: 'row',

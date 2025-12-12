@@ -20,6 +20,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { Avatar } from '@/components/Avatar';
 import { colors } from '@/utils/colors';
 import { initializeHealth, isHealthAvailable } from '@/services/health';
+import Constants from 'expo-constants';
 
 // ============================================
 // SETTINGS SCREEN
@@ -143,14 +144,19 @@ export default function SettingsScreen() {
                     onPress={async () => {
                       if (healthLoading) return;
                       
+                      console.log('🔵 User tapped Enable - requesting HealthKit permissions...');
+                      
                       // Directly request permissions - this will show the native iOS dialog
                       const granted = await requestPermissions();
                       
+                      console.log('🔵 Permission request result:', granted);
+                      
                       if (!granted) {
                         // If denied, show alert with option to open Settings
+                        // The native dialog should have appeared, but if user denied, guide them to Settings
                         Alert.alert(
                           'Health Data Access Required',
-                          'Lock-In needs access to your Apple Health data to track your fitness metrics.\n\nPlease enable Health data access in:\nSettings → Privacy & Security → Health → Lock-In',
+                          'Lock-In needs access to your Apple Health data to track your fitness metrics.\n\nTo enable:\n1. Open Settings\n2. Go to Privacy & Security → Health\n3. Find Lock-In and enable all data types',
                           [
                             { text: 'Cancel', style: 'cancel' },
                             {
@@ -166,6 +172,9 @@ export default function SettingsScreen() {
                             },
                           ]
                         );
+                      } else {
+                        // Permissions granted - refresh the UI
+                        console.log('✅ HealthKit permissions granted!');
                       }
                     }}
                     style={styles.permissionButton}
@@ -280,7 +289,7 @@ export default function SettingsScreen() {
         </View>
         
         {/* Version */}
-        <Text style={styles.version}>Lock-In v1.0.0</Text>
+        <Text style={styles.version}>Lock-In v{Constants.expoConfig?.version || '1.0.0'}</Text>
       </ScrollView>
     </SafeAreaView>
   );
