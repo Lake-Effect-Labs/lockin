@@ -155,14 +155,25 @@ export default function SettingsScreen() {
                         // Wait a moment for iOS to process the request
                         await new Promise(resolve => setTimeout(resolve, 500));
                         
+                        // Get current state for debugging
+                        const { isAvailable: nowAvailable, error: healthError } = useHealthStore.getState();
+                        
                         if (!granted) {
                           // Check if app appears in Health settings now
                           // Even if denied, the app should appear in Settings → Privacy → Health
+                          const debugMsg = `Permission request returned: ${granted ? 'SUCCESS' : 'FAILED'}\n\n` +
+                            `Current status:\n` +
+                            `- Available: ${nowAvailable}\n` +
+                            `- Error: ${healthError || 'None'}\n\n` +
+                            `If Lock-In doesn't appear in Settings → Privacy → Health:\n` +
+                            `The HealthKit entitlement may not be properly configured in this build.\n\n` +
+                            `Try rebuilding with: eas build --platform ios --profile testflight --clear-cache`;
+                          
                           Alert.alert(
                             'Health Data Access',
-                            'The permission dialog should have appeared. If you denied it, or if Lock-In doesn\'t appear in Health settings:\n\n1. Open Settings\n2. Go to Privacy & Security → Health\n3. Look for "Lock-In" in the list\n4. If it\'s there, enable all data types\n\nIf Lock-In doesn\'t appear in the list, the HealthKit entitlement may not be properly configured in this build.',
+                            debugMsg,
                             [
-                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'OK' },
                               {
                                 text: 'Open Settings',
                                 onPress: () => {
@@ -179,13 +190,23 @@ export default function SettingsScreen() {
                         } else {
                           // Permissions granted - refresh the UI
                           console.log('✅ HealthKit permissions granted!');
+                          Alert.alert(
+                            'Success',
+                            'HealthKit permissions granted! The app should now appear in Settings → Privacy → Health.'
+                          );
                         }
                       } catch (error: any) {
                         console.error('❌ Error requesting permissions:', error);
-                        Alert.alert(
-                          'Error',
-                          `Failed to request HealthKit permissions: ${error.message}\n\nThis might mean HealthKit is not properly configured in this build. Make sure you're using a TestFlight build, not Expo Go.`
-                        );
+                        const errorDetails = `Error: ${error.message || 'Unknown error'}\n\n` +
+                          `Code: ${error.code || 'N/A'}\n` +
+                          `Stack: ${error.stack ? error.stack.substring(0, 200) : 'N/A'}\n\n` +
+                          `Possible causes:\n` +
+                          `1. Native module not loaded\n` +
+                          `2. HealthKit entitlement missing\n` +
+                          `3. Build doesn't include react-native-health\n\n` +
+                          `Make sure you're using a TestFlight build, not Expo Go.`;
+                        
+                        Alert.alert('HealthKit Error', errorDetails);
                       }
                     }}
                     style={styles.permissionButton}
