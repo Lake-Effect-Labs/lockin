@@ -49,9 +49,28 @@ export async function initializeHealth(): Promise<boolean> {
 function getAppleHealthKit(): any {
   if (!AppleHealthKitModule) {
     try {
+      console.log('🔵 Attempting to load react-native-health module...');
       AppleHealthKitModule = require('react-native-health').default;
-    } catch (error) {
-      console.error('Failed to load react-native-health:', error);
+      console.log('✅ react-native-health module loaded successfully');
+      console.log('🔵 Module exports:', Object.keys(AppleHealthKitModule || {}));
+      
+      // Check if Constants are available
+      if (AppleHealthKitModule?.Constants) {
+        console.log('✅ HealthKit Constants available');
+        console.log('🔵 Available permissions:', Object.keys(AppleHealthKitModule.Constants.Permissions || {}));
+      } else {
+        console.warn('⚠️ HealthKit Constants not available');
+      }
+      
+      return AppleHealthKitModule;
+    } catch (error: any) {
+      console.error('❌ Failed to load react-native-health:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ This usually means:');
+      console.error('   1. You are using Expo Go (HealthKit requires a development build)');
+      console.error('   2. The native module is not properly linked');
+      console.error('   3. The build does not include the HealthKit entitlement');
       return null;
     }
   }
@@ -103,21 +122,41 @@ async function initializeAppleHealth(): Promise<boolean> {
     };
 
     return new Promise((resolve) => {
+      console.log('🔵 Calling AppleHealthKit.initHealthKit with permissions:', JSON.stringify(permissions, null, 2));
+      
       AppleHealthKit.initHealthKit(permissions, (error: any) => {
         if (error) {
           console.error('❌ HealthKit init error:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
-          // If it's a permission denial, the native dialog should have appeared
-          // Return false so the app knows permissions weren't granted
-          if (error.message?.includes('denied') || error.message?.includes('not authorized') || error.message?.includes('permission')) {
-            console.log('⚠️ HealthKit permissions denied - user needs to enable in Settings');
-            resolve(false); // Return false so UI can prompt user to go to Settings
+          console.error('❌ Error code:', error.code);
+          console.error('❌ Error message:', error.message);
+          console.error('❌ Full error:', JSON.stringify(error, null, 2));
+          
+          // Common error codes:
+          // - 2: HealthKit not available on device
+          // - 3: HealthKit not available in region
+          // - 4: Authorization denied
+          // - 5: Invalid argument
+          
+          if (error.code === 2) {
+            console.log('❌ HealthKit not available on this device');
+            resolve(false);
+          } else if (error.code === 3) {
+            console.log('❌ HealthKit not available in this region');
+            resolve(false);
+          } else if (error.code === 4 || error.message?.includes('denied') || error.message?.includes('not authorized') || error.message?.includes('permission')) {
+            console.log('⚠️ HealthKit permissions denied - this is OK, user can enable in Settings');
+            // Even if denied, HealthKit was initialized - app should appear in Settings
+            // Return true so app knows HealthKit is available, just needs permissions
+            resolve(true);
           } else {
-            console.log('❌ HealthKit initialization failed with error:', error.message);
+            console.log('❌ HealthKit initialization failed with unknown error');
+            console.log('❌ This might mean HealthKit entitlement is not properly configured in the build');
             resolve(false);
           }
         } else {
-          console.log('✅ HealthKit initialized successfully - permission dialog should have appeared');
+          console.log('✅ HealthKit initialized successfully!');
+          console.log('✅ Permission dialog should have appeared');
+          console.log('✅ App should now appear in Settings → Privacy → Health');
           resolve(true);
         }
       });

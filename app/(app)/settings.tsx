@@ -146,35 +146,46 @@ export default function SettingsScreen() {
                       
                       console.log('🔵 User tapped Enable - requesting HealthKit permissions...');
                       
-                      // Directly request permissions - this will show the native iOS dialog
-                      const granted = await requestPermissions();
-                      
-                      console.log('🔵 Permission request result:', granted);
-                      
-                      if (!granted) {
-                        // If denied, show alert with option to open Settings
-                        // The native dialog should have appeared, but if user denied, guide them to Settings
-                        Alert.alert(
-                          'Health Data Access Required',
-                          'Lock-In needs access to your Apple Health data to track your fitness metrics.\n\nTo enable:\n1. Open Settings\n2. Go to Privacy & Security → Health\n3. Find Lock-In and enable all data types',
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Open Settings',
-                              onPress: () => {
-                                if (Platform.OS === 'ios') {
-                                  // Try to open Health settings directly, fallback to app settings
-                                  Linking.openURL('x-apple-health://').catch(() => {
-                                    Linking.openURL('app-settings:');
-                                  });
-                                }
+                      try {
+                        // Directly request permissions - this will show the native iOS dialog
+                        const granted = await requestPermissions();
+                        
+                        console.log('🔵 Permission request result:', granted);
+                        
+                        // Wait a moment for iOS to process the request
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        if (!granted) {
+                          // Check if app appears in Health settings now
+                          // Even if denied, the app should appear in Settings → Privacy → Health
+                          Alert.alert(
+                            'Health Data Access',
+                            'The permission dialog should have appeared. If you denied it, or if Lock-In doesn\'t appear in Health settings:\n\n1. Open Settings\n2. Go to Privacy & Security → Health\n3. Look for "Lock-In" in the list\n4. If it\'s there, enable all data types\n\nIf Lock-In doesn\'t appear in the list, the HealthKit entitlement may not be properly configured in this build.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Open Settings',
+                                onPress: () => {
+                                  if (Platform.OS === 'ios') {
+                                    // Try to open Health settings directly, fallback to app settings
+                                    Linking.openURL('x-apple-health://').catch(() => {
+                                      Linking.openURL('app-settings:');
+                                    });
+                                  }
+                                },
                               },
-                            },
-                          ]
+                            ]
+                          );
+                        } else {
+                          // Permissions granted - refresh the UI
+                          console.log('✅ HealthKit permissions granted!');
+                        }
+                      } catch (error: any) {
+                        console.error('❌ Error requesting permissions:', error);
+                        Alert.alert(
+                          'Error',
+                          `Failed to request HealthKit permissions: ${error.message}\n\nThis might mean HealthKit is not properly configured in this build. Make sure you're using a TestFlight build, not Expo Go.`
                         );
-                      } else {
-                        // Permissions granted - refresh the UI
-                        console.log('✅ HealthKit permissions granted!');
                       }
                     }}
                     style={styles.permissionButton}
