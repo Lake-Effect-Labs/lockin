@@ -14,10 +14,29 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { colors } from '@/utils/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+
+// Conditionally import AdMob only when not in Expo Go
+let BannerAd: any = null;
+let BannerAdSize: any = null;
+let TestIds: any = null;
+let mobileAds: any = null;
+
+try {
+  // Only import AdMob if we're not in Expo Go
+  if (Constants.executionEnvironment !== 'storeClient') {
+    const admob = require('react-native-google-mobile-ads');
+    BannerAd = admob.BannerAd;
+    BannerAdSize = admob.BannerAdSize;
+    TestIds = admob.TestIds;
+    mobileAds = admob.mobileAds;
+  }
+} catch (error) {
+  // AdMob not available (likely Expo Go)
+  console.log('AdMob not available in this environment');
+}
 interface AdBannerProps {
   unitId?: string;
   style?: any;
@@ -63,17 +82,20 @@ export function AdBanner({
     }
   };
 
+  // Check if AdMob is available
+  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
+
   // Get the ad unit ID - use test ID if not provided or in development
   const getAdUnitId = () => {
     if (unitId) return unitId;
-    if (__DEV__) return TestIds.BANNER;
+    if (__DEV__) return TestIds?.BANNER || 'test-banner-id';
 
     // Production: use environment variables
     const envVar = Platform.OS === 'ios'
       ? Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_IOS
       : Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID;
 
-    return envVar || TestIds.BANNER;
+    return envVar || TestIds?.BANNER || 'test-banner-id';
   };
 
   if (!isVisible || adDismissedToday) {
@@ -87,12 +109,22 @@ export function AdBanner({
           <Text style={styles.adLabelText}>Ad</Text>
         </View>
         <View style={styles.adWrapper}>
-          <BannerAd
-            unitId={getAdUnitId()}
-            size={size}
-            onAdLoaded={onAdLoaded}
-            onAdFailedToLoad={onAdFailedToLoad}
-          />
+          {isAdMobAvailable ? (
+            <BannerAd
+              unitId={getAdUnitId()}
+              size={size}
+              onAdLoaded={onAdLoaded}
+              onAdFailedToLoad={onAdFailedToLoad}
+            />
+          ) : (
+            // Show placeholder when AdMob is not available (Expo Go)
+            <View style={styles.adPlaceholder}>
+              <Ionicons name="megaphone-outline" size={24} color={colors.text.tertiary} />
+              <Text style={styles.adPlaceholderText}>
+                Advertisement
+              </Text>
+            </View>
+          )}
         </View>
       </View>
       <TouchableOpacity

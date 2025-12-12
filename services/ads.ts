@@ -5,9 +5,22 @@
 // ============================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+
+// Conditionally import AdMob only when not in Expo Go
+let mobileAds: any = null;
+let MaxAdContentRating: any = null;
+
+try {
+  if (Constants.executionEnvironment !== 'storeClient') {
+    const admob = require('react-native-google-mobile-ads');
+    mobileAds = admob.mobileAds;
+    MaxAdContentRating = admob.MaxAdContentRating;
+  }
+} catch (error) {
+  console.log('AdMob not available in this environment');
+}
 
 export interface AdConfig {
   enabled: boolean;
@@ -87,15 +100,15 @@ export function isAdMobConfigured(): boolean {
  */
 export function getBannerAdUnitId(): string {
   if (__DEV__) {
-    return mobileAds.TestIds.BANNER;
+    return mobileAds?.TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111';
   }
 
   const config = Constants.expoConfig?.extra;
 
   if (Platform.OS === 'ios') {
-    return config?.EXPO_PUBLIC_ADMOB_BANNER_IOS || mobileAds.TestIds.BANNER;
+    return config?.EXPO_PUBLIC_ADMOB_BANNER_IOS || mobileAds?.TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111';
   } else {
-    return config?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID || mobileAds.TestIds.BANNER;
+    return config?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID || mobileAds?.TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111';
   }
 }
 
