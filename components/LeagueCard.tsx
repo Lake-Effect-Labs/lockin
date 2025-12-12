@@ -145,7 +145,7 @@ export function EmptyLeagueCard({ type, onPress }: EmptyLeagueCardProps) {
           <LinearGradient
             colors={isCreate 
               ? colors.gradients.primary
-              : [colors.secondary[500], colors.secondary[600]]
+              : colors.gradients.secondary
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
