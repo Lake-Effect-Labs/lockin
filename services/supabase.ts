@@ -336,13 +336,31 @@ export async function getLeague(leagueId: string): Promise<League | null> {
 }
 
 export async function getLeagueByCode(joinCode: string): Promise<League | null> {
+  // Normalize join code: trim whitespace and convert to uppercase
+  const normalizedCode = joinCode.trim().toUpperCase();
+  
+  console.log(`🔍 getLeagueByCode: Searching for code "${normalizedCode}" (original: "${joinCode}")`);
+  
   const { data, error } = await supabase
     .from('leagues')
     .select('*')
-    .eq('join_code', joinCode.toUpperCase())
+    .eq('join_code', normalizedCode)
     .single();
   
-  if (error && error.code !== 'PGRST116') throw error;
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No rows found - this is expected if league doesn't exist
+      console.log(`❌ No league found with code "${normalizedCode}"`);
+      return null;
+    }
+    console.error(`❌ Database error looking up league code "${normalizedCode}":`, error);
+    throw error;
+  }
+  
+  if (data) {
+    console.log(`✅ Found league: ${data.name} (ID: ${data.id}, Code: ${data.join_code})`);
+  }
+  
   return data;
 }
 
