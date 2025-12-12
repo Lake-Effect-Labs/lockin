@@ -439,15 +439,22 @@ Join Code: ${joinCode}`;
               </Text>
               {currentMatchup && league.start_date && <LiveIndicator isLive={!isPlayoffs} />}
             </View>
-            {currentMatchup && league.start_date && <Countdown daysRemaining={daysRemaining} />}
+            {currentMatchup && league.start_date && new Date(league.start_date) <= new Date() && (
+              <Countdown daysRemaining={daysRemaining} label="Week ends in" />
+            )}
+            {league.start_date && new Date(league.start_date) > new Date() && (
+              <Countdown daysRemaining={daysRemaining} label="League starts in" />
+            )}
           </View>
           
-          {!league.start_date ? (
+          {!league.start_date || (league.start_date && new Date(league.start_date) > new Date()) ? (
             <View style={styles.waitingContainer}>
               <Ionicons name="hourglass-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.waitingText}>
-                {members.length >= league.max_players 
-                  ? `League is full! Starting on ${league.start_date ? new Date(league.start_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'next Monday'}.`
+                {members.length >= league.max_players && league.start_date
+                  ? `League starts in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}!`
+                  : members.length >= league.max_players
+                  ? `League is full! Starting on next Monday.`
                   : `The league will start on the next Monday once ${league.max_players} players have joined.`}
               </Text>
               <Text style={styles.waitingSubtext}>

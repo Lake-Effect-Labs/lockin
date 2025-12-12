@@ -61,13 +61,17 @@ export function generateWeekData(startDate?: Date): DailyHealthData[] {
   const start = startDate || getStartOfCurrentWeek();
   const data: DailyHealthData[] = [];
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
   
   for (let i = 0; i < 7; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
+    date.setHours(0, 0, 0, 0); // Normalize to start of day
     
     // Only generate data up to today
     if (date <= today) {
+      // Use date as seed for consistent data per day
+      // This ensures the same date always generates the same data
       const seed = date.getTime();
       const metrics = generateDailyMetrics(seed);
       

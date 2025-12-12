@@ -215,10 +215,21 @@ export async function getLeagueDashboard(
     }
   }
   
-  // Calculate days remaining in week (only if league has started)
-  const daysRemaining = league.start_date 
-    ? calculateDaysRemainingInWeek(league.start_date, currentWeek)
-    : 0;
+  // Calculate days remaining
+  // If league hasn't started yet, show days until start
+  // If league has started, show days remaining in current week
+  let daysRemaining = 0;
+  if (!league.start_date) {
+    // League hasn't started - show days until next Monday
+    const { getNextMonday } = require('../utils/dates');
+    const nextMonday = getNextMonday();
+    const now = new Date();
+    const diffTime = nextMonday.getTime() - now.getTime();
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  } else {
+    // League has started - show days remaining in current week
+    daysRemaining = calculateDaysRemainingInWeek(league.start_date, currentWeek);
+  }
   
   // Build playoff bracket if in playoffs
   const playoffBracket = isPlayoffs ? buildPlayoffBracket(playoffs, members) : null;
