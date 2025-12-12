@@ -286,24 +286,51 @@ Join Code: ${joinCode}`;
   const { league, currentMatchup, userScore, opponentScore, standings, daysRemaining, isPlayoffs, isAdmin, members } = currentDashboard;
   
   // Get points breakdown if we have user score (use league-specific scoring config)
-  const leagueScoringConfig = league.scoring_config 
-    ? getScoringConfig(league.scoring_config)
-    : undefined;
-  const breakdown = userScore ? getPointsBreakdown({
-    steps: userScore.steps,
-    sleepHours: userScore.sleep_hours,
-    calories: userScore.calories,
-    workouts: userScore.workouts,
-    distance: userScore.distance,
-  }, leagueScoringConfig) : null;
+  // Handle scoring_config which might be a JSON string or object
+  let leagueScoringConfig: ReturnType<typeof getScoringConfig> | undefined;
+  try {
+    if (league.scoring_config) {
+      // If it's a string, parse it first
+      const config = typeof league.scoring_config === 'string' 
+        ? JSON.parse(league.scoring_config) 
+        : league.scoring_config;
+      leagueScoringConfig = getScoringConfig(config);
+    }
+  } catch (error) {
+    console.error('Error parsing scoring config:', error);
+    // Use default config if parsing fails
+    leagueScoringConfig = undefined;
+  }
   
-  const opponentBreakdown = opponentScore ? getPointsBreakdown({
-    steps: opponentScore.steps,
-    sleepHours: opponentScore.sleep_hours,
-    calories: opponentScore.calories,
-    workouts: opponentScore.workouts,
-    distance: opponentScore.distance,
-  }, leagueScoringConfig) : null;
+  let breakdown: ReturnType<typeof getPointsBreakdown> | null = null;
+  let opponentBreakdown: ReturnType<typeof getPointsBreakdown> | null = null;
+  
+  try {
+    if (userScore) {
+      breakdown = getPointsBreakdown({
+        steps: userScore.steps || 0,
+        sleepHours: userScore.sleep_hours || 0,
+        calories: userScore.calories || 0,
+        workouts: userScore.workouts || 0,
+        distance: userScore.distance || 0,
+      }, leagueScoringConfig);
+    }
+    
+    if (opponentScore) {
+      opponentBreakdown = getPointsBreakdown({
+        steps: opponentScore.steps || 0,
+        sleepHours: opponentScore.sleep_hours || 0,
+        calories: opponentScore.calories || 0,
+        workouts: opponentScore.workouts || 0,
+        distance: opponentScore.distance || 0,
+      }, leagueScoringConfig);
+    }
+  } catch (error) {
+    console.error('Error calculating points breakdown:', error);
+    // Set to null if calculation fails - UI will handle gracefully
+    breakdown = null;
+    opponentBreakdown = null;
+  }
   
   // Calculate current scores (use breakdown totals for accuracy)
   const calculatedMyScore = breakdown?.totalPoints ?? userScore?.total_points ?? 0;

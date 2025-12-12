@@ -119,12 +119,19 @@ export async function getLeagueDashboard(
   leagueId: string,
   userId: string
 ): Promise<LeagueDashboard> {
-  const [league, members, allMatchups, playoffs] = await Promise.all([
-    getLeague(leagueId),
-    getLeagueMembers(leagueId),
-    getMatchups(leagueId),
-    getPlayoffs(leagueId),
-  ]);
+  let league, members, allMatchups, playoffs;
+  
+  try {
+    [league, members, allMatchups, playoffs] = await Promise.all([
+      getLeague(leagueId),
+      getLeagueMembers(leagueId),
+      getMatchups(leagueId),
+      getPlayoffs(leagueId).catch(() => []), // Playoffs might not exist, that's OK
+    ]);
+  } catch (error: any) {
+    console.error('Error fetching league dashboard data:', error);
+    throw new Error(`Failed to load league: ${error.message || 'Unknown error'}`);
+  }
   
   if (!league) throw new Error('League not found');
   
@@ -170,36 +177,41 @@ export async function getLeagueDashboard(
   let opponentScore: WeeklyScore | null = null;
   
   if (currentMatchup) {
-    const isPlayer1 = currentMatchup.player1_id === userId;
-    const opponentId = isPlayer1 
-      ? currentMatchup.player2_id 
-      : currentMatchup.player1_id;
-    
-    // Only fetch real scores if opponent is not fake
-    const isFakeOpponent = opponentId.startsWith('fake-opponent-');
-    
-    [userScore, opponentScore] = await Promise.all([
-      getWeeklyScore(leagueId, userId, currentWeek),
-      isFakeOpponent ? Promise.resolve(null) : getWeeklyScore(leagueId, opponentId, currentWeek),
-    ]);
-    
-    // Generate fake opponent score if needed
-    if (isFakeOpponent && !opponentScore && currentMatchup) {
-      const fakeScore = isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score;
-      opponentScore = {
-        id: `fake-score-${currentWeek}`,
-        league_id: leagueId,
-        user_id: opponentId,
-        week_number: currentWeek,
-        steps: Math.floor(fakeScore * 100),
-        sleep_hours: Math.floor(fakeScore / 20),
-        calories: Math.floor(fakeScore * 50),
-        workouts: Math.floor(fakeScore / 20),
-        distance: Math.floor(fakeScore / 10),
-        total_points: fakeScore,
-        last_synced_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
+    try {
+      const isPlayer1 = currentMatchup.player1_id === userId;
+      const opponentId = isPlayer1 
+        ? currentMatchup.player2_id 
+        : currentMatchup.player1_id;
+      
+      // Only fetch real scores if opponent is not fake
+      const isFakeOpponent = opponentId.startsWith('fake-opponent-') || opponentId.startsWith('fake-member-');
+      
+      [userScore, opponentScore] = await Promise.all([
+        getWeeklyScore(leagueId, userId, currentWeek).catch(() => null),
+        isFakeOpponent ? Promise.resolve(null) : getWeeklyScore(leagueId, opponentId, currentWeek).catch(() => null),
+      ]);
+      
+      // Generate fake opponent score if needed
+      if (isFakeOpponent && !opponentScore && currentMatchup) {
+        const fakeScore = isPlayer1 ? (currentMatchup.player2_score || 0) : (currentMatchup.player1_score || 0);
+        opponentScore = {
+          id: `fake-score-${currentWeek}`,
+          league_id: leagueId,
+          user_id: opponentId,
+          week_number: currentWeek,
+          steps: Math.floor(fakeScore * 100),
+          sleep_hours: Math.floor(fakeScore / 20),
+          calories: Math.floor(fakeScore * 50),
+          workouts: Math.floor(fakeScore / 20),
+          distance: Math.floor(fakeScore / 10),
+          total_points: fakeScore || 0,
+          last_synced_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching weekly scores:', error);
+      // Continue with null scores - UI will handle gracefully
     }
   }
   
