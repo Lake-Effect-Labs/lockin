@@ -36,6 +36,12 @@ const DEFAULT_CONFIG: AdConfig = {
  */
 export async function initializeAdMob(): Promise<void> {
   try {
+    // Check if we have valid AdMob app IDs before initializing
+    if (!isAdMobConfigured()) {
+      console.log('⚠️ AdMob not configured, skipping initialization');
+      return;
+    }
+
     // Set up AdMob with appropriate content rating
     await mobileAds().setRequestConfiguration({
       // Maximum ad content rating for family-friendly content
@@ -50,6 +56,8 @@ export async function initializeAdMob(): Promise<void> {
     console.log('✅ AdMob initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize AdMob:', error);
+    console.error('Error details:', error);
+    // Don't crash the app - just log the error
   }
 }
 
@@ -64,6 +72,14 @@ export function getAdMobAppId(): string | null {
   } else {
     return config?.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID || null;
   }
+}
+
+/**
+ * Check if AdMob is properly configured
+ */
+export function isAdMobConfigured(): boolean {
+  const appId = getAdMobAppId();
+  return appId !== null && appId !== 'ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX';
 }
 
 /**

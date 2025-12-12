@@ -41,7 +41,13 @@ export default function RootLayout() {
         await initNetworkMonitoring();
         await initAuth();
         await initHealth();
-        await initializeAdMob();
+
+        // Initialize AdMob (won't crash if not configured)
+        try {
+          await initializeAdMob();
+        } catch (error) {
+          console.warn('AdMob initialization failed, continuing without ads:', error);
+        }
       } catch (error: any) {
         // Log error but don't crash - let ErrorBoundary handle it
         // Still mark as initialized so app can show error UI
