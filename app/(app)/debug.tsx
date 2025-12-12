@@ -172,9 +172,13 @@ export default function DebugScreen() {
         `• Different Apple ID\n` +
         `• Device restart\n\n` +
         `If app not in Health settings:\n` +
-        `• Tap "Enable Health" in app first\n` +
+        `• Tap "Force HealthKit Init" first\n` +
+        `• Check Settings → Privacy → Health\n` +
         `• Force quit and restart app\n` +
-        `• Delete and reinstall TestFlight build`
+        `• Delete and reinstall TestFlight build\n\n` +
+        `📱 CURRENT BUILD STATUS:\n` +
+        `Build in progress at Expo...\n` +
+        `Check: https://expo.dev/accounts/samfilipiak/projects/lock-in/builds/b590d246-3399-437f-9ec7-096a20d7207c`
       );
     } catch (error: any) {
       Alert.alert('Error', `Failed to get diagnostics: ${error.message}`);
