@@ -135,6 +135,46 @@ export async function getLeagueDashboard(
   
   if (!league) throw new Error('League not found');
   
+  // Auto-advance week if calendar week has advanced beyond current_week
+  if (league.start_date && league.current_week < league.season_length_weeks) {
+    const { getWeekNumber } = await import('../utils/dates');
+    const actualWeek = getWeekNumber(league.start_date);
+    
+    if (actualWeek > league.current_week) {
+      console.log(`📅 League ${leagueId}: Auto-advancing from week ${league.current_week} to week ${actualWeek}`);
+      
+      // Finalize any incomplete weeks between current_week and actualWeek
+      const { finalizeWeek, startLeagueSeason } = await import('./supabase');
+      for (let week = league.current_week; week < actualWeek; week++) {
+        try {
+          await finalizeWeek(leagueId, week);
+          console.log(`✅ Finalized week ${week}`);
+        } catch (error: any) {
+          console.error(`Error finalizing week ${week}:`, error);
+        }
+      }
+      
+      // Generate matchups for any missing weeks
+      for (let week = league.current_week + 1; week <= actualWeek; week++) {
+        const weekMatchups = allMatchups.filter(m => m.week_number === week);
+        if (weekMatchups.length === 0 && week <= league.season_length_weeks) {
+          console.log(`📋 Generating matchups for week ${week}...`);
+          try {
+            await startLeagueSeason(leagueId);
+            // Refresh matchups after generation
+            allMatchups = await getMatchups(leagueId);
+          } catch (error: any) {
+            console.error(`Error generating matchups for week ${week}:`, error);
+          }
+        }
+      }
+      
+      // Refresh league to get updated current_week
+      league = await getLeague(leagueId);
+      if (!league) throw new Error('League not found after update');
+    }
+  }
+  
   const currentWeek = league.current_week;
   const isPlayoffs = league.playoffs_started;
   

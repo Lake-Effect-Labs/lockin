@@ -151,13 +151,30 @@ export function getEndOfWeek(date: Date = new Date()): Date {
 }
 
 /**
- * Get week number from start date
+ * Get week number from start date (Monday-Sunday weeks)
+ * Returns the current week number based on calendar weeks since start_date
  */
 export function getWeekNumber(startDate: Date | string, currentDate: Date = new Date()): number {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const diffMs = currentDate.getTime() - start.getTime();
+  const current = new Date(currentDate);
+  
+  // Normalize to start of day
+  start.setHours(0, 0, 0, 0);
+  current.setHours(0, 0, 0, 0);
+  
+  // Get the Monday of the start week
+  const startMonday = getStartOfWeekMonday(start);
+  
+  // Get the Monday of the current week
+  const currentMonday = getStartOfWeekMonday(current);
+  
+  // Calculate difference in weeks
+  const diffMs = currentMonday.getTime() - startMonday.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  return Math.floor(diffDays / 7) + 1;
+  const weekNumber = Math.floor(diffDays / 7) + 1;
+  
+  // Week number should be at least 1
+  return Math.max(1, weekNumber);
 }
 
 /**

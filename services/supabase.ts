@@ -495,6 +495,17 @@ export async function startLeagueSeason(leagueId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Generate matchups for a specific week (or next week if not specified)
+ * This is called automatically when weeks advance
+ */
+export async function generateMatchupsForWeek(leagueId: string, weekNumber?: number): Promise<void> {
+  // The generate_matchups function now handles generating only missing weeks
+  // So we can just call it and it will generate the next week
+  const { error } = await supabase.rpc('generate_matchups', { p_league_id: leagueId });
+  if (error) throw error;
+}
+
 // ============================================
 // MATCHUP FUNCTIONS
 // ============================================
