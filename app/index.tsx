@@ -40,17 +40,15 @@ export default function Index() {
     
     try {
       const parsed = Linking.parse(url);
-      console.log('🔗 Deep link parsed:', parsed);
-      
+
       // Handle join league deep link: lockin://join?code=ABC123
       if (parsed.path === 'join' && parsed.queryParams?.code) {
         const code = parsed.queryParams.code as string;
-        console.log('🔗 Navigating to join with code:', code);
         // Use the join route handler which will handle auth state
         router.replace(`/join?code=${code}`);
       }
     } catch (error) {
-      console.error('Error handling deep link:', error);
+      // Deep link parsing failed
     }
   };
   

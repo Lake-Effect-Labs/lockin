@@ -16,6 +16,114 @@ import { colors } from '@/utils/colors';
 import { Matchup, WeeklyScore, LeagueMember } from '@/services/supabase';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 
+// Sub-components for better organization
+interface StatsSectionProps {
+  breakdown: any;
+  userScore: WeeklyScore;
+}
+
+function StatsSection({ breakdown, userScore }: StatsSectionProps) {
+  if (!breakdown) return null;
+
+  return (
+    <View style={styles.statsContainer}>
+      <Text style={styles.sectionTitle}>Your Stats</Text>
+      <View style={styles.statsGrid}>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>👟</Text>
+          <Text style={styles.statValue}>
+            {userScore.steps.toLocaleString()}
+          </Text>
+          <Text style={styles.statLabel}>Steps</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>😴</Text>
+          <Text style={styles.statValue}>
+            {userScore.sleep_hours.toFixed(1)}h
+          </Text>
+          <Text style={styles.statLabel}>Sleep</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>🔥</Text>
+          <Text style={styles.statValue}>
+            {userScore.calories.toLocaleString()}
+          </Text>
+          <Text style={styles.statLabel}>Calories</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>💪</Text>
+          <Text style={styles.statValue}>{userScore.workouts}</Text>
+          <Text style={styles.statLabel}>Workouts</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>🏃</Text>
+          <Text style={styles.statValue}>
+            {userScore.distance.toFixed(1)}
+          </Text>
+          <Text style={styles.statLabel}>Miles</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statIcon}>⭐</Text>
+          <Text style={styles.statValue}>
+            {breakdown.totalPoints.toFixed(1)}
+          </Text>
+          <Text style={styles.statLabel}>Points</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+interface LeagueStandingProps {
+  userRank: number;
+  totalPlayers: number;
+}
+
+function LeagueStanding({ userRank, totalPlayers }: LeagueStandingProps) {
+  return (
+    <View style={styles.rankContainer}>
+      <Text style={styles.sectionTitle}>League Standing</Text>
+      <View style={styles.rankBox}>
+        <Ionicons
+          name="trophy-outline"
+          size={24}
+          color={colors.sport.gold}
+        />
+        <Text style={styles.rankText}>
+          Rank #{userRank} of {totalPlayers}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+interface VictoryActionsProps {
+  onShare: () => void;
+  onClose: () => void;
+}
+
+function VictoryActions({ onShare, onClose }: VictoryActionsProps) {
+  return (
+    <View style={styles.actions}>
+      <TouchableOpacity
+        style={[styles.button, styles.shareButton]}
+        onPress={onShare}
+      >
+        <Ionicons name="share-outline" size={20} color="#FFF" />
+        <Text style={styles.buttonText}>Share Victory</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, styles.closeButtonStyle]}
+        onPress={onClose}
+      >
+        <Text style={[styles.buttonText, styles.closeButtonText]}>
+          Continue
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 const { width } = Dimensions.get('window');
 
 interface WeeklyRecapProps {
@@ -121,7 +229,7 @@ Rank: #${userRank} of ${totalPlayers}
     try {
       await Share.share({ message });
     } catch (error) {
-      console.error('Share error:', error);
+      // Share failed - silently continue
     }
   };
 
@@ -147,8 +255,8 @@ Rank: #${userRank} of ${totalPlayers}
       outputRange: [1, 1, 1, 0],
     });
 
-    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
-    const color = colors[index % colors.length];
+    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
+    const color = confettiColors[index % confettiColors.length];
 
     return (
       <Animated.View
@@ -263,87 +371,13 @@ Rank: #${userRank} of ${totalPlayers}
             </View>
 
             {/* Key Stats */}
-            {breakdown && (
-              <View style={styles.statsContainer}>
-                <Text style={styles.sectionTitle}>Your Stats</Text>
-                <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>👟</Text>
-                    <Text style={styles.statValue}>
-                      {userScore.steps.toLocaleString()}
-                    </Text>
-                    <Text style={styles.statLabel}>Steps</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>😴</Text>
-                    <Text style={styles.statValue}>
-                      {userScore.sleep_hours.toFixed(1)}h
-                    </Text>
-                    <Text style={styles.statLabel}>Sleep</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>🔥</Text>
-                    <Text style={styles.statValue}>
-                      {userScore.calories.toLocaleString()}
-                    </Text>
-                    <Text style={styles.statLabel}>Calories</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>💪</Text>
-                    <Text style={styles.statValue}>{userScore.workouts}</Text>
-                    <Text style={styles.statLabel}>Workouts</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>🏃</Text>
-                    <Text style={styles.statValue}>
-                      {userScore.distance.toFixed(1)}
-                    </Text>
-                    <Text style={styles.statLabel}>Miles</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statIcon}>⭐</Text>
-                    <Text style={styles.statValue}>
-                      {breakdown.totalPoints.toFixed(1)}
-                    </Text>
-                    <Text style={styles.statLabel}>Points</Text>
-                  </View>
-                </View>
-              </View>
-            )}
+            {breakdown && userScore && <StatsSection breakdown={breakdown} userScore={userScore} />}
 
             {/* League Rank */}
-            <View style={styles.rankContainer}>
-              <Text style={styles.sectionTitle}>League Standing</Text>
-              <View style={styles.rankBox}>
-                <Ionicons
-                  name="trophy-outline"
-                  size={24}
-                  color={colors.sport.gold}
-                />
-                <Text style={styles.rankText}>
-                  Rank #{userRank} of {totalPlayers}
-                </Text>
-              </View>
-            </View>
+            <LeagueStanding userRank={userRank} totalPlayers={totalPlayers} />
 
             {/* Actions */}
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.button, styles.shareButton]}
-                onPress={handleShare}
-              >
-                <Ionicons name="share-outline" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Share Victory</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.closeButtonStyle]}
-                onPress={onClose}
-              >
-                <Text style={[styles.buttonText, styles.closeButtonText]}>
-                  Continue
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <VictoryActions onShare={handleShare} onClose={onClose} />
           </ScrollView>
         </Animated.View>
       </View>
@@ -415,7 +449,7 @@ const styles = StyleSheet.create({
   tieBadge: {
     backgroundColor: colors.background.secondary,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.border.default,
   },
   lossBadge: {
     backgroundColor: colors.background.secondary,

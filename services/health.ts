@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { FitnessMetrics } from './scoring';
 
 // ============================================
@@ -22,6 +23,9 @@ export interface DailyHealthData extends FitnessMetrics {
 // Check if we're in a development environment
 const isDevelopment = __DEV__;
 
+// Check if we're in Expo Go (which doesn't support HealthKit)
+const isExpoGo = Constants?.executionEnvironment === 'storeClient';
+
 // Cache the HealthKit module to avoid repeated requires
 let AppleHealthKitModule: any = null;
 
@@ -31,14 +35,27 @@ let AppleHealthKitModule: any = null;
  */
 export async function initializeHealth(): Promise<boolean> {
   if (Platform.OS !== 'ios') {
-    console.log('Health data only available on iOS');
+    // Health data only available on iOS
+    return false;
+  }
+
+  if (isExpoGo) {
+    console.log('⚠️ HealthKit not available in Expo Go');
+    console.log('🔧 Use a development build: eas build --platform ios --profile development');
     return false;
   }
 
   try {
-    return await initializeAppleHealth();
+    const success = await initializeAppleHealth();
+
+    if (!success && !isDevelopment) {
+      console.log('⚠️ HealthKit initialization failed in production build');
+      console.log('📱 This is normal - enable permissions manually in Settings > Privacy > Health');
+    }
+
+    return success;
   } catch (error) {
-    console.error('Failed to initialize health:', error);
+    console.error('❌ Failed to initialize health:', error);
     return false;
   }
 }
@@ -49,17 +66,17 @@ export async function initializeHealth(): Promise<boolean> {
 function getAppleHealthKit(): any {
   if (!AppleHealthKitModule) {
     try {
-      console.log('🔵 Attempting to load react-native-health module...');
+      // Attempting to load react-native-health module
       AppleHealthKitModule = require('react-native-health').default;
-      console.log('✅ react-native-health module loaded successfully');
-      console.log('🔵 Module exports:', Object.keys(AppleHealthKitModule || {}));
+      // react-native-health module loaded successfully
+      // Module exports available
       
       // Check if Constants are available
       if (AppleHealthKitModule?.Constants) {
-        console.log('✅ HealthKit Constants available');
-        console.log('🔵 Available permissions:', Object.keys(AppleHealthKitModule.Constants.Permissions || {}));
+        // HealthKit Constants available
+        // Available permissions loaded
       } else {
-        console.warn('⚠️ HealthKit Constants not available');
+        // HealthKit Constants not available
       }
       
       return AppleHealthKitModule;
@@ -409,5 +426,45 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
  */
 export function isHealthAvailable(): boolean {
   return Platform.OS === 'ios';
+}
+
+/**
+ * Comprehensive health diagnostics for debugging TestFlight issues
+ */
+export async function getHealthDiagnostics(): Promise<{
+  platform: string;
+  isExpoGo: boolean;
+  isDevelopment: boolean;
+  moduleLoaded: boolean;
+  deviceSupported: boolean;
+  initializationAttempted: boolean;
+  entitlementsConfigured: boolean;
+  bundleId: string;
+}> {
+  const AppleHealthKit = getAppleHealthKit();
+
+  let deviceSupported = false;
+  if (AppleHealthKit) {
+    try {
+      deviceSupported = await new Promise<boolean>((resolve) => {
+        AppleHealthKit.isAvailable((error: any, available: boolean) => {
+          resolve(!error && available);
+        });
+      });
+    } catch (error) {
+      console.error('Device support check failed:', error);
+    }
+  }
+
+  return {
+    platform: Platform.OS,
+    isExpoGo: Constants.executionEnvironment === 'storeClient',
+    isDevelopment: __DEV__,
+    moduleLoaded: !!AppleHealthKit,
+    deviceSupported,
+    initializationAttempted: false, // This would be tracked separately
+    entitlementsConfigured: true, // Based on app.json config
+    bundleId: Constants.expoConfig?.ios?.bundleIdentifier || 'unknown'
+  };
 }
 

@@ -226,7 +226,7 @@ export const useLeagueStore = create<LeagueState>((set, get) => ({
     try {
       return await processWeekEnd(leagueId);
     } catch (error: any) {
-      console.error('Check week end error:', error);
+      // Check week end error occurred
       return false;
     }
   },

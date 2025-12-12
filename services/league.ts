@@ -129,7 +129,7 @@ export async function getLeagueDashboard(
       getPlayoffs(leagueId).catch(() => []), // Playoffs might not exist, that's OK
     ]);
   } catch (error: any) {
-    console.error('Error fetching league dashboard data:', error);
+    // Error fetching league dashboard data
     throw new Error(`Failed to load league: ${error.message || 'Unknown error'}`);
   }
   
@@ -141,16 +141,16 @@ export async function getLeagueDashboard(
     const actualWeek = getWeekNumber(league.start_date);
     
     if (actualWeek > league.current_week) {
-      console.log(`📅 League ${leagueId}: Auto-advancing from week ${league.current_week} to week ${actualWeek}`);
+      // League auto-advanced to new week
       
       // Finalize any incomplete weeks between current_week and actualWeek
       const { finalizeWeek, startLeagueSeason } = await import('./supabase');
       for (let week = league.current_week; week < actualWeek; week++) {
         try {
           await finalizeWeek(leagueId, week);
-          console.log(`✅ Finalized week ${week}`);
+          // Week finalized successfully
         } catch (error: any) {
-          console.error(`Error finalizing week ${week}:`, error);
+          // Error finalizing week
         }
       }
       
@@ -160,7 +160,7 @@ export async function getLeagueDashboard(
       for (let week = league.current_week + 1; week <= actualWeek; week++) {
         const weekMatchups = allMatchups.filter(m => m.week_number === week);
         if (weekMatchups.length === 0 && week <= league.season_length_weeks) {
-          console.log(`📋 Generating matchups for week ${week}...`);
+          // Generating matchups for new week
           try {
             // The generate_matchups function checks current_week and generates matchups for it
             // So we need to update current_week first, then generate
@@ -178,7 +178,7 @@ export async function getLeagueDashboard(
             // Refresh matchups after generation
             allMatchups = await getMatchups(leagueId);
           } catch (error: any) {
-            console.error(`Error generating matchups for week ${week}:`, error);
+            // Error generating matchups
           }
         }
       }
@@ -271,7 +271,7 @@ export async function getLeagueDashboard(
         };
       }
     } catch (error) {
-      console.error('Error fetching weekly scores:', error);
+      // Error fetching weekly scores
       // Continue with null scores - UI will handle gracefully
     }
   }
@@ -408,7 +408,7 @@ export async function processWeekEnd(leagueId: string): Promise<boolean> {
   const { getMatchups, startLeagueSeason } = await import('./supabase');
   const newWeekMatchups = await getMatchups(leagueId, nextWeek);
   if (newWeekMatchups.length === 0 && nextWeek <= league.season_length_weeks) {
-    console.log(`No matchups found for week ${nextWeek}, generating them...`);
+    // No matchups found, generating them
     // Matchups should already exist, but if they don't, generate them
     // This can happen if the league wasn't seeded properly
     await startLeagueSeason(leagueId);
@@ -421,7 +421,7 @@ export async function processWeekEnd(leagueId: string): Promise<boolean> {
     } catch (error: any) {
       // Handle case where league has < 4 players gracefully
       if (error.message?.includes('Not enough players')) {
-        console.warn(`Cannot start playoffs for league ${leagueId}: Not enough players (need 4)`);
+        // Cannot start playoffs - insufficient players
         // Don't throw - league can continue without playoffs
       } else {
         throw error;

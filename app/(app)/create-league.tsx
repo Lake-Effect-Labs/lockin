@@ -62,13 +62,21 @@ export default function CreateLeagueScreen() {
   
   const handleCreate = async () => {
     // Validation
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       Alert.alert('League Name Required', 'Please enter a name for your league');
       return;
     }
-    
-    if (name.trim().length > 30) {
+
+    if (trimmedName.length > 30) {
       Alert.alert('Name Too Long', 'League name must be 30 characters or less');
+      return;
+    }
+
+    // Additional security validation - prevent HTML/script injection
+    const dangerousChars = /[<>]/;
+    if (dangerousChars.test(trimmedName)) {
+      Alert.alert('Invalid Name', 'League name contains invalid characters');
       return;
     }
     
@@ -79,7 +87,7 @@ export default function CreateLeagueScreen() {
     
     try {
       const config = useDefaultScoring ? null : scoringConfig;
-      const league = await createLeague(name.trim(), seasonLength, user.id, maxPlayers, config);
+      const league = await createLeague(trimmedName, seasonLength, user.id, maxPlayers, config);
       setCreatedLeague({ id: league.id, name: league.name, join_code: league.join_code });
     } catch (err: any) {
       // Better error messages
@@ -122,7 +130,7 @@ Join Code: ${joinCode}`;
         message: shareMessage,
       });
     } catch (err) {
-      console.error('Share error:', err);
+      // Share failed silently
     }
   };
   

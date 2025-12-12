@@ -13,20 +13,23 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/utils/colors';
-import { 
-  runFullTestSuite, 
-  runScoringTests, 
+import {
+  runFullTestSuite,
+  runScoringTests,
   runMatchupTests,
   runSeasonSimulation,
+  runFullIntegrationTest,
+  FullIntegrationTest,
   E2ETestResults,
   TestResult,
 } from '@/services/simulation';
-import { 
-  runHealthIntegrationTests, 
+import {
+  runHealthIntegrationTests,
   quickHealthCheck,
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
+import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth } from '@/services/health';
 import {
   runFullRegressionSuite,
   RegressionTestResults,
@@ -35,13 +38,7 @@ import {
   runWeeklySimulation,
   SimulationStep,
 } from '@/services/weeklySimulation';
-import { 
-  isBackgroundSyncAvailable, 
-  isBackgroundSyncRegistered,
-  triggerBackgroundSync,
-  getLastBackgroundSyncTime,
-  getBackgroundSyncStatusText,
-} from '@/services/backgroundSync';
+// Background sync removed - now using on-app-open sync
 import { simulateLeadChangeNotification } from '@/services/matchupMonitor';
 import { useHealthStore } from '@/store/useHealthStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -58,9 +55,11 @@ export default function DebugScreen() {
   const [testResults, setTestResults] = useState<E2ETestResults | null>(null);
   const [healthResults, setHealthResults] = useState<HealthTestSuite | null>(null);
   const [regressionResults, setRegressionResults] = useState<RegressionTestResults | null>(null);
+  const [integrationResults, setIntegrationResults] = useState<FullIntegrationTest | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isRunningHealth, setIsRunningHealth] = useState(false);
   const [isRunningRegression, setIsRunningRegression] = useState(false);
+  const [isRunningIntegration, setIsRunningIntegration] = useState(false);
   const { fakeMode, setFakeMode } = useHealthStore();
   
   const runTests = () => {
@@ -81,14 +80,14 @@ export default function DebugScreen() {
   
   const runHealthTests = async () => {
     setIsRunningHealth(true);
-    
+
     try {
       const results = await runHealthIntegrationTests();
       setHealthResults(results);
-      
+
       const passed = results.results.filter(r => r.passed).length;
       const total = results.results.length;
-      
+
       Alert.alert(
         passed === total ? '✅ Health Tests Passed!' : '⚠️ Health Tests Complete',
         results.summary
@@ -97,6 +96,40 @@ export default function DebugScreen() {
       Alert.alert('❌ Health Test Error', error.message);
     } finally {
       setIsRunningHealth(false);
+    }
+  };
+
+  const runIntegrationTests = async () => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        '⚠️ Full Integration Test',
+        'This will create real database records and simulate a complete league. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Run Test', style: 'destructive', onPress: () => resolve(true) }
+        ]
+      );
+    });
+
+    if (!confirmed) return;
+
+    setIsRunningIntegration(true);
+
+    try {
+      const results = await runFullIntegrationTest(8, 8, 'DEBUG_TEST');
+      setIntegrationResults(results);
+
+      const passed = results.summary.passedPhases;
+      const total = results.summary.totalPhases;
+
+      Alert.alert(
+        passed === total ? '✅ Integration Test Passed!' : '❌ Integration Test Failed',
+        `${passed}/${total} phases passed in ${results.summary.totalDuration}ms`
+      );
+    } catch (error: any) {
+      Alert.alert('❌ Integration Test Error', error.message);
+    } finally {
+      setIsRunningIntegration(false);
     }
   };
   
@@ -117,16 +150,35 @@ export default function DebugScreen() {
     }
   };
   
-  const showHealthDiagnostics = () => {
-    const diagnostics = getHealthDiagnostics();
-    
-    Alert.alert(
-      '📋 Health Diagnostics',
-      `Platform: ${diagnostics.platform}\n` +
-      `Available: ${diagnostics.isHealthAvailable ? '✅' : '❌'}\n\n` +
-      `Required Packages:\n${diagnostics.requiredPackages.map(p => `• ${p.name}`).join('\n') || 'None'}\n\n` +
-      `Required Permissions:\n${diagnostics.requiredPermissions.map(p => `• ${p}`).join('\n') || 'None'}`
-    );
+  const showHealthDiagnostics = async () => {
+    try {
+      const healthKitDiagnostics = await getHealthKitDiagnostics();
+      const testDiagnostics = getHealthDiagnostics();
+
+      Alert.alert(
+        '🔍 HealthKit Diagnostics (TestFlight Build)',
+        `Platform: ${healthKitDiagnostics.platform}\n` +
+        `Bundle ID: ${healthKitDiagnostics.bundleId}\n` +
+        `Expo Go: ${healthKitDiagnostics.isExpoGo ? '❌ BAD' : '✅ GOOD'}\n` +
+        `Development: ${healthKitDiagnostics.isDevelopment ? '❌ BAD (TestFlight should be production)' : '✅ GOOD (TestFlight)'}\n` +
+        `Module Loaded: ${healthKitDiagnostics.moduleLoaded ? '✅ GOOD' : '❌ BAD - react-native-health not included'}\n` +
+        `Device Supported: ${healthKitDiagnostics.deviceSupported ? '✅ GOOD' : '❌ BAD - device incompatible'}\n` +
+        `Entitlements: ${healthKitDiagnostics.entitlementsConfigured ? '✅ GOOD' : '❌ BAD - config issue'}\n\n` +
+        `🚨 TESTFLIGHT TROUBLESHOOTING:\n\n` +
+        `If Module Loaded = ❌:\n` +
+        `• Rebuild: eas build --platform ios --profile testflight --clear-cache\n\n` +
+        `If Device Supported = ❌:\n` +
+        `• Test on iPhone 6s+ (iOS 11+)\n` +
+        `• Different Apple ID\n` +
+        `• Device restart\n\n` +
+        `If app not in Health settings:\n` +
+        `• Tap "Enable Health" in app first\n` +
+        `• Force quit and restart app\n` +
+        `• Delete and reinstall TestFlight build`
+      );
+    } catch (error: any) {
+      Alert.alert('Error', `Failed to get diagnostics: ${error.message}`);
+    }
   };
   
   const runWeeklySimulationInteractive = async () => {
@@ -248,39 +300,7 @@ export default function DebugScreen() {
   };
   
   // Background Sync Tests
-  const checkBackgroundSyncStatus = async () => {
-    try {
-      const { available, status } = await isBackgroundSyncAvailable();
-      const registered = await isBackgroundSyncRegistered();
-      const lastSync = await getLastBackgroundSyncTime();
-      
-      Alert.alert(
-        '🔄 Background Sync Status',
-        `Available: ${available ? '✅' : '❌'}\n` +
-        `Status: ${getBackgroundSyncStatusText(status)}\n` +
-        `Registered: ${registered ? '✅' : '❌'}\n` +
-        `Last Sync: ${lastSync ? new Date(lastSync).toLocaleString() : 'Never'}`
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-  
-  const testBackgroundSync = async () => {
-    try {
-      Alert.alert('Testing...', 'Running background sync manually...');
-      const result = await triggerBackgroundSync();
-      
-      Alert.alert(
-        result.success ? '✅ Sync Complete' : '⚠️ Sync Skipped',
-        result.success 
-          ? `Points: ${result.points}\nLeagues synced: ${result.leaguesSynced}`
-          : `Reason: ${result.reason}`
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
+  // Background sync removed - now using on-app-open sync
   
   // Notification Tests
   const testOpponentTakesLeadNotification = async () => {
@@ -362,7 +382,29 @@ export default function DebugScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="information-circle" size={20} color={colors.primary[500]} />
-            <Text style={styles.secondaryText}>Show Diagnostics</Text>
+            <Text style={styles.secondaryText}>HealthKit Diagnostics</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                Alert.alert('🔄 Force Initializing...', 'Attempting to initialize HealthKit...');
+                const success = await initializeHealth();
+                Alert.alert(
+                  success ? '✅ Success!' : '⚠️ Partial Success',
+                  success
+                    ? 'HealthKit initialized! Check Settings → Privacy → Health for Lock-In app.'
+                    : 'HealthKit initialization returned false. Check diagnostics for details.'
+                );
+              } catch (error: any) {
+                Alert.alert('❌ Error', `HealthKit initialization failed: ${error.message}`);
+              }
+            }}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh" size={20} color={colors.primary[500]} />
+            <Text style={styles.secondaryText}>Force HealthKit Init</Text>
           </TouchableOpacity>
           
           {/* Health Test Results */}
@@ -388,27 +430,14 @@ export default function DebugScreen() {
           )}
         </View>
         
-        {/* Background Sync Tests */}
+        {/* On-App-Open Sync Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔄 Background Sync</Text>
-          
-          <TouchableOpacity
-            onPress={checkBackgroundSyncStatus}
-            style={styles.secondaryButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="information-circle" size={20} color={colors.primary[500]} />
-            <Text style={styles.secondaryText}>Check Status</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={testBackgroundSync}
-            style={styles.secondaryButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="sync" size={20} color={colors.primary[500]} />
-            <Text style={styles.secondaryText}>Trigger Manual Sync</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>🔄 Sync Strategy</Text>
+          <Text style={styles.infoText}>
+            Data syncs automatically when users open the app.{'\n'}
+            No background sync - simpler and more cost-effective!{'\n\n'}
+            Live updates still work when viewing matchups (30s intervals).
+          </Text>
         </View>
         
         {/* Notification Tests */}
@@ -462,7 +491,23 @@ export default function DebugScreen() {
               </Text>
             </LinearGradient>
           </TouchableOpacity>
-          
+
+          <TouchableOpacity
+            onPress={runIntegrationTests}
+            disabled={isRunningIntegration}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#8B5CF6', '#7C3AED']}
+              style={styles.actionButton}
+            >
+              <Ionicons name="construct" size={20} color={colors.text.primary} />
+              <Text style={styles.actionText}>
+                {isRunningIntegration ? 'Running Integration...' : 'Full Integration Test'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={runQuickSimulation}
             style={styles.secondaryButton}
@@ -537,7 +582,41 @@ export default function DebugScreen() {
             </View>
           </View>
         )}
-        
+
+        {/* Integration Test Results */}
+        {integrationResults && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🚀 Integration Test Results</Text>
+
+            <View style={styles.summaryCard}>
+              <Text style={[
+                styles.summaryText,
+                integrationResults.summary.success ? styles.passedText : styles.failedText
+              ]}>
+                {integrationResults.summary.passedPhases}/{integrationResults.summary.totalPhases} phases passed
+              </Text>
+              <Text style={styles.durationText}>
+                Duration: {integrationResults.summary.totalDuration}ms
+              </Text>
+            </View>
+
+            {integrationResults.results.map((result, i) => (
+              <View key={i} style={styles.integrationRow}>
+                <View style={styles.phaseHeader}>
+                  <Ionicons
+                    name={result.success ? 'checkmark-circle' : 'close-circle'}
+                    size={18}
+                    color={result.success ? colors.status.success : colors.status.error}
+                  />
+                  <Text style={styles.phaseTitle}>{result.phase}</Text>
+                  <Text style={styles.phaseDuration}>{result.duration}ms</Text>
+                </View>
+                <Text style={styles.phaseDetails}>{result.details}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Use Case Checklist */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Use Case Checklist</Text>
@@ -822,6 +901,33 @@ const styles = StyleSheet.create({
   useCaseText: {
     fontSize: 12,
     color: colors.text.secondary,
+  },
+  integrationRow: {
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  phaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  phaseTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    flex: 1,
+  },
+  phaseDuration: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+  },
+  phaseDetails: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    lineHeight: 20,
   },
   regressionResultsCard: {
     backgroundColor: colors.background.card,

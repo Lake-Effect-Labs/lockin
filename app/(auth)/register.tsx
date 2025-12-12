@@ -72,7 +72,6 @@ export default function RegisterScreen() {
             await updateUsername(username.trim());
           } catch (err: any) {
             // Username update failed, but signup succeeded - continue anyway
-            console.warn('Failed to set username:', err);
           }
         }
         

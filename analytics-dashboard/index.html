@@ -331,18 +331,30 @@
                     .slice(0, 10);
                 
                 const recentLeaguesTbody = document.querySelector('#recentLeagues tbody');
-                recentLeaguesTbody.innerHTML = recentLeagues.map(league => {
+                recentLeaguesTbody.innerHTML = '';
+                recentLeagues.forEach(league => {
                     const memberCount = membersData.filter(m => m.league_id === league.id).length;
                     const status = league.start_date ? 'Active' : 'Waiting';
-                    return `
-                        <tr>
-                            <td>${league.name}</td>
-                            <td>${new Date(league.created_at).toLocaleDateString()}</td>
-                            <td>${memberCount}/${league.max_players}</td>
-                            <td>${status}</td>
-                        </tr>
-                    `;
-                }).join('');
+                    const row = document.createElement('tr');
+
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = league.name;
+                    row.appendChild(nameCell);
+
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = new Date(league.created_at).toLocaleDateString();
+                    row.appendChild(dateCell);
+
+                    const membersCell = document.createElement('td');
+                    membersCell.textContent = `${memberCount}/${league.max_players}`;
+                    row.appendChild(membersCell);
+
+                    const statusCell = document.createElement('td');
+                    statusCell.textContent = status;
+                    row.appendChild(statusCell);
+
+                    recentLeaguesTbody.appendChild(row);
+                });
                 
                 // League size distribution
                 const sizeCounts = {};
@@ -352,18 +364,27 @@
                 });
                 
                 const leagueSizesTbody = document.querySelector('#leagueSizes tbody');
-                leagueSizesTbody.innerHTML = Object.entries(sizeCounts)
+                leagueSizesTbody.innerHTML = '';
+                Object.entries(sizeCounts)
                     .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-                    .map(([size, count]) => {
+                    .forEach(([size, count]) => {
                         const percentage = ((count / totalLeagues) * 100).toFixed(1);
-                        return `
-                            <tr>
-                                <td>${size} Players</td>
-                                <td>${count}</td>
-                                <td>${percentage}%</td>
-                            </tr>
-                        `;
-                    }).join('');
+                        const row = document.createElement('tr');
+
+                        const sizeCell = document.createElement('td');
+                        sizeCell.textContent = `${size} Players`;
+                        row.appendChild(sizeCell);
+
+                        const countCell = document.createElement('td');
+                        countCell.textContent = String(count);
+                        row.appendChild(countCell);
+
+                        const percentageCell = document.createElement('td');
+                        percentageCell.textContent = `${percentage}%`;
+                        row.appendChild(percentageCell);
+
+                        leagueSizesTbody.appendChild(row);
+                    });
                 
                 // User activity (last 7 days)
                 const activityByDate = {};
@@ -399,18 +420,29 @@
                 });
                 
                 const userActivityTbody = document.querySelector('#userActivity tbody');
-                userActivityTbody.innerHTML = Object.entries(activityByDate)
-                    .map(([date, activity]) => {
-                        const dateObj = new Date(date);
-                        return `
-                            <tr>
-                                <td>${dateObj.toLocaleDateString()}</td>
-                                <td>${activity.newUsers}</td>
-                                <td>${activity.leaguesCreated}</td>
-                                <td>${activity.leaguesJoined}</td>
-                            </tr>
-                        `;
-                    }).join('');
+                userActivityTbody.innerHTML = '';
+                Object.entries(activityByDate).forEach(([date, activity]) => {
+                    const dateObj = new Date(date);
+                    const row = document.createElement('tr');
+
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = dateObj.toLocaleDateString();
+                    row.appendChild(dateCell);
+
+                    const newUsersCell = document.createElement('td');
+                    newUsersCell.textContent = String(activity.newUsers);
+                    row.appendChild(newUsersCell);
+
+                    const leaguesCreatedCell = document.createElement('td');
+                    leaguesCreatedCell.textContent = String(activity.leaguesCreated);
+                    row.appendChild(leaguesCreatedCell);
+
+                    const leaguesJoinedCell = document.createElement('td');
+                    leaguesJoinedCell.textContent = String(activity.leaguesJoined);
+                    row.appendChild(leaguesJoinedCell);
+
+                    userActivityTbody.appendChild(row);
+                });
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';

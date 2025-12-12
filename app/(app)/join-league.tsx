@@ -39,9 +39,16 @@ export default function JoinLeagueScreen() {
   
   const handleJoin = async () => {
     const cleanCode = code.trim().toUpperCase();
-    
+
     if (cleanCode.length !== 6) {
       Alert.alert('Invalid Code', 'Please enter a valid 6-character join code');
+      return;
+    }
+
+    // Additional validation - only allow alphanumeric characters
+    const validCodeRegex = /^[A-Z0-9]+$/;
+    if (!validCodeRegex.test(cleanCode)) {
+      Alert.alert('Invalid Code', 'Join code can only contain letters and numbers');
       return;
     }
     

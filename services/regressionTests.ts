@@ -420,8 +420,8 @@ export function runPlayoffTests(): TestResult[] {
   
   // Test: Should start playoffs function
   try {
-    const shouldStart = shouldStartPlayoffs(8, 8, 8); // Week 8 of 8, 8 players
-    const shouldNotStart = shouldStartPlayoffs(7, 8, 8); // Week 7 of 8, 8 players
+    const shouldStart = shouldStartPlayoffs(8, 8, false); // Week 8 of 8, playoffs not started
+    const shouldNotStart = shouldStartPlayoffs(7, 8, false); // Week 7 of 8, playoffs not started
     
     results.push({
       name: 'Playoff Start Logic',

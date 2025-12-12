@@ -31,11 +31,11 @@ export function getScoringConfig(leagueConfig?: ScoringConfig | null): typeof DE
   if (!leagueConfig) return DEFAULT_SCORING_CONFIG;
   
   return {
-    POINTS_PER_1000_STEPS: leagueConfig.points_per_1000_steps ?? DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS,
-    POINTS_PER_SLEEP_HOUR: leagueConfig.points_per_sleep_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR,
-    POINTS_PER_100_ACTIVE_CAL: leagueConfig.points_per_100_active_cal ?? DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL,
-    POINTS_PER_WORKOUT: leagueConfig.points_per_workout ?? DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT,
-    POINTS_PER_MILE: leagueConfig.points_per_mile ?? DEFAULT_SCORING_CONFIG.POINTS_PER_MILE,
+    POINTS_PER_1000_STEPS: (leagueConfig.points_per_1000_steps ?? DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS) as 1,
+    POINTS_PER_SLEEP_HOUR: (leagueConfig.points_per_sleep_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR) as 2,
+    POINTS_PER_100_ACTIVE_CAL: (leagueConfig.points_per_100_active_cal ?? DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL) as 5,
+    POINTS_PER_WORKOUT: (leagueConfig.points_per_workout ?? DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT) as 20,
+    POINTS_PER_MILE: (leagueConfig.points_per_mile ?? DEFAULT_SCORING_CONFIG.POINTS_PER_MILE) as 3,
   };
 }
 

@@ -192,6 +192,7 @@ export function generateMockLeague(userId: string): League {
     is_active: true,
     playoffs_started: false,
     champion_id: null,
+    max_players: 8,
     created_at: getWeeksAgoDate(3),
   };
 }
@@ -225,6 +226,7 @@ export function generateMockMembers(league: League, users: User[]): LeagueMember
       total_points: randomInRange(50, 200) * league.current_week,
       playoff_seed: null,
       is_eliminated: false,
+      is_admin: index === 0, // First user is admin
       joined_at: league.created_at,
       user,
     };

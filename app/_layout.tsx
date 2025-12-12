@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHealthStore } from '@/store/useHealthStore';
@@ -9,9 +9,9 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { colors } from '@/utils/colors';
 import { initNetworkMonitoring } from '@/services/errorHandler';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { registerBackgroundSync, isBackgroundSyncAvailable } from '@/services/backgroundSync';
 import { registerForPushNotifications } from '@/services/notifications';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { syncOnAppOpen } from '@/services/realtimeSync';
 
 // ============================================
 // ROOT LAYOUT
@@ -42,7 +42,6 @@ export default function RootLayout() {
         await initHealth();
       } catch (error: any) {
         // Log error but don't crash - let ErrorBoundary handle it
-        console.error('App initialization error:', error);
         // Still mark as initialized so app can show error UI
         if (!authInitialized) {
           // Force initialization to complete even on error
@@ -78,31 +77,26 @@ export default function RootLayout() {
       
       // Register for push notifications
       registerForPushNotifications(user.id).then((token) => {
-        if (token) {
-          console.log('✅ Push notifications registered');
-        }
+        // Push notifications registered if token exists
       });
       
-      // Register background sync (handle errors gracefully - not available in Expo Go)
-      // Wrap in try-catch to prevent any errors from showing red screen
-      (async () => {
-        try {
-          const { available } = await isBackgroundSyncAvailable();
-          if (available) {
-            const success = await registerBackgroundSync(user.id, fakeMode);
-            if (success && __DEV__) {
-              console.log('✅ Background sync registered');
-            }
-          }
-          // Silently skip if not available (expected in Expo Go)
-        } catch (error: any) {
-          // Silently ignore - background fetch not available in Expo Go
-          // Only log in development
-          if (__DEV__) {
-            console.log('⚠️ Background sync not available (expected in Expo Go)');
+      // Sync data when app opens (replaces background sync)
+      // This ensures data is fresh when users open the app
+      const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+        if (nextAppState === 'active' && user?.id) {
+          try {
+            await syncOnAppOpen(user.id);
+          } catch (error: any) {
+            // Silently handle sync errors - don't interrupt user experience
+            console.log('App-open sync failed:', error.message);
           }
         }
-      })();
+      });
+
+      // Cleanup subscription on unmount
+      return () => {
+        appStateSubscription?.remove();
+      };
     }
   }, [user?.id, fakeMode]);
   

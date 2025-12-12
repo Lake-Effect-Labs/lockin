@@ -123,7 +123,7 @@ export default function LeagueDashboardScreen() {
                   setShowRecap(true);
                 }
               } catch (error) {
-                console.error('Error loading recap data:', error);
+                // Error loading recap data
               }
             }
           }
@@ -186,7 +186,7 @@ Join Code: ${joinCode}`;
         message: shareMessage,
       });
     } catch (err) {
-      console.error('Share error:', err);
+      // Share error occurred
     }
   };
   
@@ -293,12 +293,12 @@ Join Code: ${joinCode}`;
     if (league.scoring_config) {
       // If it's a string, parse it first
       const config = typeof league.scoring_config === 'string' 
-        ? JSON.parse(league.scoring_config) 
+        ? JSON.parse(league.scoring_config as string) 
         : league.scoring_config;
       leagueScoringConfig = getScoringConfig(config);
     }
   } catch (error) {
-    console.error('Error parsing scoring config:', error);
+    // Error parsing scoring config
     // Use default config if parsing fails
     leagueScoringConfig = undefined;
   }
@@ -327,7 +327,7 @@ Join Code: ${joinCode}`;
       }, leagueScoringConfig);
     }
   } catch (error) {
-    console.error('Error calculating points breakdown:', error);
+    // Error calculating points breakdown
     // Set to null if calculation fails - UI will handle gracefully
     breakdown = null;
     opponentBreakdown = null;

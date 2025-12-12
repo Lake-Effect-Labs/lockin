@@ -44,7 +44,7 @@ export function WeekProgressBar({
         {/* Regular season bar */}
         <View style={styles.barBackground}>
           <LinearGradient
-            colors={colors.gradients.primary}
+            colors={colors.gradients.primary as any}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={[styles.barFill, { width: `${progress * 100}%` }]}

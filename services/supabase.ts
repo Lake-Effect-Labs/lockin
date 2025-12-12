@@ -34,8 +34,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-
 // Validate Supabase credentials
 if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co' || 
     !supabaseAnonKey || supabaseAnonKey === 'your-anon-key') {
-  console.error('⚠️ CRITICAL: Supabase credentials are missing or invalid!');
-  console.error('Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  // Supabase credentials validation - errors logged above
   // Don't throw here - let the app start and show error in UI
 }
 
@@ -290,7 +289,7 @@ export async function createLeague(
   // Generate unique join code (already uppercase from generateJoinCode)
   const joinCode = generateJoinCode().toUpperCase().trim();
   
-  console.log(`📝 Creating league with join code: "${joinCode}"`);
+  // League creation in progress
   
   const { data, error } = await supabase
     .from('leagues')
@@ -341,7 +340,7 @@ export async function getLeagueByCode(joinCode: string): Promise<League | null> 
   // Normalize join code: trim whitespace and convert to uppercase
   const normalizedCode = joinCode.trim().toUpperCase();
   
-  console.log(`🔍 getLeagueByCode: Searching for code "${normalizedCode}" (original: "${joinCode}")`);
+  // Searching for league by code
   
   const { data, error } = await supabase
     .from('leagues')
@@ -352,15 +351,15 @@ export async function getLeagueByCode(joinCode: string): Promise<League | null> 
   if (error) {
     if (error.code === 'PGRST116') {
       // No rows found - this is expected if league doesn't exist
-      console.log(`❌ No league found with code "${normalizedCode}"`);
+      // No league found with provided code
       return null;
     }
-    console.error(`❌ Database error looking up league code "${normalizedCode}":`, error);
+    // Database error occurred
     throw error;
   }
   
   if (data) {
-    console.log(`✅ Found league: ${data.name} (ID: ${data.id}, Code: ${data.join_code})`);
+    // League found successfully
   }
   
   return data;
@@ -395,15 +394,15 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     throw new Error('Invalid join code. Join codes must be 6 characters.');
   }
   
-  console.log(`🔍 Looking up league with join code: ${normalizedCode}`);
+  // Looking up league with join code
   const league = await getLeagueByCode(normalizedCode);
   
   if (!league) {
-    console.error(`❌ League not found for join code: ${normalizedCode}`);
+    // League not found for join code
     throw new Error('League not found. Please check the join code and try again.');
   }
   
-  console.log(`✅ Found league: ${league.name} (${league.id})`);
+  // League found and validated
   
   // Check if already a member
   const existingMember = await supabase

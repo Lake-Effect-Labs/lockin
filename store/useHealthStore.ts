@@ -119,7 +119,7 @@ export const useHealthStore = create<HealthState>()(
             });
           }
         } catch (error: any) {
-          console.error('Health initialization error:', error);
+          // Health initialization error occurred
           set({
             isInitialized: true,
             isAvailable: false,
@@ -134,13 +134,13 @@ export const useHealthStore = create<HealthState>()(
         try {
           set({ isLoading: true, error: null });
           
-          console.log('🔵 Requesting HealthKit permissions...');
+          // Requesting HealthKit permissions
           const initialized = await initializeHealth();
-          console.log('🔵 HealthKit initialization result:', initialized);
+          // HealthKit initialization completed
           
           if (initialized) {
             const permissions = await checkHealthPermissions();
-            console.log('🔵 HealthKit permissions check:', permissions);
+            // HealthKit permissions checked
             set({ 
               isAvailable: true,
               permissions, 
@@ -149,11 +149,11 @@ export const useHealthStore = create<HealthState>()(
             return true;
           }
           
-          console.log('⚠️ HealthKit initialization failed');
+          // HealthKit initialization failed
           set({ isLoading: false, error: 'Failed to initialize HealthKit. Make sure you\'re using a development build, not Expo Go.' });
           return false;
         } catch (error: any) {
-          console.error('❌ Request permissions error:', error);
+          // Request permissions error
           set({ error: error.message || 'Failed to request HealthKit permissions', isLoading: false });
           return false;
         }
@@ -187,7 +187,7 @@ export const useHealthStore = create<HealthState>()(
           
           return data;
         } catch (error: any) {
-          console.error('Sync today data error:', error);
+          // Sync today data error
           set({ error: error.message, isLoading: false });
           return null;
         }
@@ -216,7 +216,7 @@ export const useHealthStore = create<HealthState>()(
                 distance: dayData.distance,
               });
             }
-            console.log(`✅ Stored ${data.length} days of fake data for league syncing`);
+            // Fake data stored for league syncing
           } else {
             // Get real health data
             data = await getCurrentWeekHealthData();
@@ -237,7 +237,7 @@ export const useHealthStore = create<HealthState>()(
           
           return data;
         } catch (error: any) {
-          console.error('Sync week data error:', error);
+          // Sync week data error
           set({ error: error.message, isLoading: false });
           return [];
         }
@@ -248,7 +248,7 @@ export const useHealthStore = create<HealthState>()(
         try {
           await syncWeeklyToLeagues(userId);
         } catch (error: any) {
-          console.error('Sync to leagues error:', error);
+          // Sync to leagues error
         }
       },
 

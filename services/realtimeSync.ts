@@ -18,15 +18,15 @@ import { checkMatchupAndNotify, startMatchupMonitoring, stopMatchupMonitoring } 
 // ============================================
 
 export const SYNC_CONFIG = {
-  // How often to sync when app is in foreground (ms)
-  FOREGROUND_INTERVAL: 5 * 60 * 1000, // 5 minutes
-  
+  // Disabled - now using on-app-open sync instead of automatic intervals
+  FOREGROUND_INTERVAL: 0, // No automatic foreground sync
+
   // Minimum time between syncs (ms) - prevents excessive API calls
   MIN_SYNC_INTERVAL: 60 * 1000, // 1 minute
-  
+
   // How often to sync when viewing a matchup (ms)
-  MATCHUP_VIEW_INTERVAL: 30 * 1000, // 30 seconds
-  
+  MATCHUP_VIEW_INTERVAL: 30 * 1000, // 30 seconds (keep for matchup views)
+
   // Debounce time for rapid syncs (ms)
   DEBOUNCE_TIME: 5 * 1000, // 5 seconds
 };
@@ -70,7 +70,7 @@ const state: SyncState = {
  * Initialize the real-time sync system
  */
 export function initializeRealtimeSync(userId: string, useFakeData: boolean = false): void {
-  console.log('🔄 Initializing real-time sync system...');
+  // Initializing real-time sync system
   
   // Clean up any existing subscriptions
   cleanupRealtimeSync();
@@ -96,7 +96,7 @@ export function initializeRealtimeSync(userId: string, useFakeData: boolean = fa
   // Do an immediate sync
   syncNow(userId, useFakeData);
   
-  console.log('✅ Real-time sync initialized');
+  // Real-time sync initialized
 }
 
 /**
@@ -128,13 +128,14 @@ export function cleanupRealtimeSync(): void {
  * Start foreground sync interval
  */
 function startForegroundSync(userId: string, useFakeData: boolean): void {
+  // Disabled automatic foreground sync - now using on-app-open sync
+  // Only clear any existing interval if it exists
   if (state.syncInterval) {
     clearInterval(state.syncInterval);
+    state.syncInterval = null;
   }
-  
-  state.syncInterval = setInterval(() => {
-    syncNow(userId, useFakeData);
-  }, SYNC_CONFIG.FOREGROUND_INTERVAL);
+
+  // No automatic interval started - sync only happens on app open
 }
 
 /**
@@ -147,7 +148,7 @@ function handleAppStateChange(
 ): void {
   if (nextState === 'active') {
     // App came to foreground - sync immediately
-    console.log('📱 App active - syncing...');
+    // App active - syncing
     syncNow(userId, useFakeData);
     startForegroundSync(userId, useFakeData);
   } else if (nextState === 'background') {
@@ -174,7 +175,7 @@ function subscribeToScoreUpdates(userId: string): void {
         table: 'weekly_scores',
       },
       (payload) => {
-        console.log('📡 Real-time score update:', payload);
+        // Real-time score update received
         
         // Notify listeners of remote update
         if (payload.new && (payload.new as any).user_id !== userId) {
@@ -214,12 +215,12 @@ export async function syncNow(
   // Check if we should sync (debounce)
   const now = Date.now();
   if (!force && state.isSyncing) {
-    console.log('⏳ Sync already in progress, skipping...');
+    // Sync already in progress, skipping
     return null;
   }
   
   if (!force && now - state.lastSyncTime < SYNC_CONFIG.MIN_SYNC_INTERVAL) {
-    console.log('⏳ Too soon since last sync, skipping...');
+    // Too soon since last sync, skipping
     return null;
   }
   
@@ -227,7 +228,7 @@ export async function syncNow(
   state.lastSyncTime = now;
   
   try {
-    console.log('🔄 Syncing health data...');
+    // Syncing health data
     
     // Get health data
     let weekData: DailyHealthData[];
@@ -260,10 +261,10 @@ export async function syncNow(
     // Store last sync time
     await AsyncStorage.setItem('last_sync_time', update.timestamp);
     
-    console.log('✅ Sync complete:', weeklyPoints, 'points');
+    // Sync complete
     return update;
   } catch (error) {
-    console.error('❌ Sync error:', error);
+    // Sync error occurred
     return null;
   } finally {
     state.isSyncing = false;
@@ -303,7 +304,7 @@ async function syncToAllLeagues(userId: string, metrics: FitnessMetrics): Promis
             weekMetrics = aggregateWeeklyMetrics(weekData);
           }
         } catch (error) {
-          console.warn(`Could not get league-specific health data for league ${league.id}, using aggregated metrics`);
+          // Could not get league-specific health data, using aggregated metrics
         }
       }
       
@@ -321,8 +322,62 @@ async function syncToAllLeagues(userId: string, metrics: FitnessMetrics): Promis
       );
     }
   } catch (error) {
-    console.error('Error syncing to leagues:', error);
+    // Error syncing to leagues
     // Don't throw - we want to continue syncing to other leagues
+  }
+}
+
+// ============================================
+// ON-APP-OPEN SYNC (REPLACES BACKGROUND SYNC)
+// ============================================
+
+/**
+ * Sync user data when they open the app
+ * Replaces complex background sync with simple foreground sync
+ */
+export async function syncOnAppOpen(userId: string): Promise<void> {
+  try {
+    console.log('🔄 [App Open] Syncing user data...');
+
+    const { fakeMode } = await import('./health');
+    const useFakeData = fakeMode || !(await import('./health')).then(m => m.isHealthAvailable());
+
+    // Get current week health data
+    let weekData: DailyHealthData[];
+
+    if (useFakeData) {
+      const { generateWeekData } = await import('@/utils/fakeData');
+      weekData = generateWeekData();
+    } else {
+      const { getCurrentWeekHealthData } = await import('./health');
+      weekData = await getCurrentWeekHealthData();
+    }
+
+    // Calculate weekly totals
+    const { aggregateWeeklyMetrics, calculatePoints } = await import('./scoring');
+    const weeklyTotals = aggregateWeeklyMetrics(weekData);
+    const weeklyPoints = calculatePoints(weeklyTotals);
+
+    // Sync to all active leagues
+    await syncToAllLeagues(userId, weeklyTotals);
+
+    // Create update object for listeners
+    const update: SyncUpdate = {
+      type: 'local',
+      userId,
+      weeklyTotals,
+      weeklyPoints,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Notify listeners
+    notifyListeners(update);
+
+    console.log('✅ [App Open] Sync completed:', weeklyPoints, 'points');
+
+  } catch (error: any) {
+    console.error('❌ [App Open] Sync failed:', error);
+    // Don't throw - we don't want to interrupt the user experience
   }
 }
 
@@ -346,7 +401,7 @@ function notifyListeners(update: SyncUpdate): void {
     try {
       listener(update);
     } catch (error) {
-      console.error('Listener error:', error);
+      // Listener error occurred
     }
   });
 }
@@ -361,7 +416,7 @@ let matchupInterval: NodeJS.Timeout | null = null;
  * Start rapid sync for matchup view (more frequent updates)
  */
 export function startMatchupViewSync(userId: string, useFakeData: boolean): void {
-  console.log('🎯 Starting matchup view sync (30s interval)');
+  // Starting matchup view sync
   
   // Clear existing matchup interval
   if (matchupInterval) {
@@ -374,15 +429,13 @@ export function startMatchupViewSync(userId: string, useFakeData: boolean): void
   // Start rapid sync
   matchupInterval = setInterval(() => {
     syncNow(userId, useFakeData);
-  }, SYNC_CONFIG.MATCHUP_VIEW_INTERVAL);
+  }, SYNC_CONFIG.MATCHUP_VIEW_INTERVAL) as any;
 }
 
 /**
  * Stop rapid sync when leaving matchup view
  */
 export function stopMatchupViewSync(): void {
-  console.log('🛑 Stopping matchup view sync');
-  
   if (matchupInterval) {
     clearInterval(matchupInterval);
     matchupInterval = null;
@@ -456,7 +509,7 @@ async function checkLeadChanges(userId: string, opponentData: any): Promise<void
     
     // Validate required fields
     if (!leagueId || !week || !opponentId) {
-      console.log('⚠️ Missing required fields in opponentData, skipping lead check');
+      // Missing required fields in opponentData, skipping lead check
       return;
     }
     
@@ -490,7 +543,7 @@ async function checkLeadChanges(userId: string, opponentData: any): Promise<void
       opponentName
     );
   } catch (error) {
-    console.error('Error checking lead changes:', error);
+    // Error checking lead changes
   }
 }
 

@@ -44,7 +44,7 @@ export interface NotificationPayload {
  */
 export async function registerForPushNotifications(userId?: string): Promise<string | null> {
   if (!Device.isDevice) {
-    console.log('Push notifications require a physical device');
+    // Push notifications require a physical device
     return null;
   }
 
@@ -116,6 +116,7 @@ export async function scheduleNotification(
       sound: true,
     },
     trigger: {
+      type: 'date' as any,
       date,
     },
   });

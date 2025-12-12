@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHealthStore } from '@/store/useHealthStore';
+import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { Avatar } from '@/components/Avatar';
 import { colors } from '@/utils/colors';
@@ -135,7 +136,7 @@ export default function SettingsScreen() {
                   <View>
                     <Text style={styles.settingLabel}>Health Data</Text>
                     <Text style={styles.settingDescription}>
-                      {isAvailable ? 'Connected to Apple Health' : 'Not connected'}
+                      {isAvailable ? 'Connected to Apple Health' : (Platform.OS === 'ios' ? 'Tap to enable Health access' : 'Health data not available')}
                     </Text>
                   </View>
                 </View>
@@ -144,59 +145,76 @@ export default function SettingsScreen() {
                     onPress={async () => {
                       if (healthLoading) return;
                       
-                      console.log('🔵 User tapped Enable - requesting HealthKit permissions...');
+                      // User tapped Enable - requesting HealthKit permissions
                       
+                      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+                      const isDevelopment = __DEV__;
+
                       try {
-                        // Directly request permissions - this will show the native iOS dialog
+                        if (isExpoGo) {
+                          Alert.alert(
+                            'Expo Go Detected',
+                            'HealthKit requires a development build. Expo Go cannot access native health APIs.\n\nUse this command to build for testing:\n\nnpx eas build --platform ios --profile development',
+                            [{ text: 'OK' }]
+                          );
+                          return;
+                        }
+
+                        // For production builds (TestFlight), permissions often need to be enabled manually
+                        if (!isDevelopment) {
+                          Alert.alert(
+                            'TestFlight Health Access',
+                            'In TestFlight builds, you need to manually enable Health permissions:\n\n1. Open Settings app\n2. Go to Privacy & Security\n3. Tap Health\n4. Find "Lock-In" and enable permissions\n\nThen restart the app.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Open Settings',
+                                onPress: () => {
+                                  Linking.openURL('App-prefs:Privacy&path=HEALTH').catch(() => {
+                                    Linking.openURL('App-prefs:Privacy').catch(() => {
+                                      Alert.alert('Manual Setup Required', 'Please go to Settings > Privacy & Security > Health and enable permissions for Lock-In.');
+                                    });
+                                  });
+                                }
+                              }
+                            ]
+                          );
+                          return;
+                        }
+
+                        // Development build - try in-app permission request
                         const granted = await requestPermissions();
-                        
-                        console.log('🔵 Permission request result:', granted);
-                        
+
                         // Wait a moment for iOS to process the request
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        
+
                         // Get current state for debugging
                         const { isAvailable: nowAvailable, error: healthError } = useHealthStore.getState();
-                        
+
                         if (!granted) {
-                          // Check if app appears in Health settings now
-                          // Even if denied, the app should appear in Settings → Privacy → Health
-                          const debugMsg = `Permission request returned: ${granted ? 'SUCCESS' : 'FAILED'}\n\n` +
-                            `Current status:\n` +
-                            `- Available: ${nowAvailable}\n` +
-                            `- Error: ${healthError || 'None'}\n\n` +
-                            `If Lock-In doesn't appear in Settings → Privacy → Health:\n` +
-                            `The HealthKit entitlement may not be properly configured in this build.\n\n` +
-                            `Try rebuilding with: eas build --platform ios --profile testflight --clear-cache`;
-                          
                           Alert.alert(
-                            'Health Data Access',
-                            debugMsg,
+                            'Permission Required',
+                            'Health permissions were not granted. You can enable them later in Settings > Privacy & Security > Health.',
                             [
                               { text: 'OK' },
                               {
                                 text: 'Open Settings',
                                 onPress: () => {
-                                  if (Platform.OS === 'ios') {
-                                    // Try to open Health settings directly, fallback to app settings
-                                    Linking.openURL('x-apple-health://').catch(() => {
-                                      Linking.openURL('app-settings:');
-                                    });
-                                  }
-                                },
-                              },
+                                  Linking.openURL('App-prefs:Privacy&path=HEALTH').catch(() => {
+                                    Linking.openSettings();
+                                  });
+                                }
+                              }
                             ]
                           );
                         } else {
-                          // Permissions granted - refresh the UI
-                          console.log('✅ HealthKit permissions granted!');
                           Alert.alert(
-                            'Success',
-                            'HealthKit permissions granted! The app should now appear in Settings → Privacy → Health.'
+                            'Success!',
+                            'Health permissions granted! You can now sync your fitness data.'
                           );
                         }
                       } catch (error: any) {
-                        console.error('❌ Error requesting permissions:', error);
+                        // Error requesting permissions
                         const errorDetails = `Error: ${error.message || 'Unknown error'}\n\n` +
                           `Code: ${error.code || 'N/A'}\n` +
                           `Stack: ${error.stack ? error.stack.substring(0, 200) : 'N/A'}\n\n` +
