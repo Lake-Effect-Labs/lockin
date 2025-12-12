@@ -42,9 +42,9 @@ export function LeagueCard({
     : '0-0';
   
   const memberUsers = members.map(m => ({
-    avatar_url: m.user?.avatar_url,
-    username: m.user?.username,
-  }));
+    avatar_url: m.user?.avatar_url || null,
+    username: m.user?.username || 'Unknown',
+  })).filter(u => u.username !== 'Unknown' || u.avatar_url); // Filter out completely empty users
   
   return (
     <TouchableOpacity 

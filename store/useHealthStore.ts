@@ -204,6 +204,19 @@ export const useHealthStore = create<HealthState>()(
           if (fakeMode || !isHealthAvailable()) {
             // Generate fake week data
             data = generateWeekData();
+            
+            // Store fake data in daily sync format so it can be synced to leagues
+            const { storeDailyData } = await import('@/services/dailySync');
+            for (const dayData of data) {
+              await storeDailyData(dayData.date, {
+                steps: dayData.steps,
+                sleepHours: dayData.sleepHours,
+                calories: dayData.calories,
+                workouts: dayData.workouts,
+                distance: dayData.distance,
+              });
+            }
+            console.log(`✅ Stored ${data.length} days of fake data for league syncing`);
           } else {
             // Get real health data
             data = await getCurrentWeekHealthData();
