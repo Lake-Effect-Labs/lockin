@@ -286,8 +286,66 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             )}
             
+            {/* HealthKit Diagnostics */}
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.settingItem}
+                onPress={async () => {
+                  try {
+                    const { getHealthDiagnostics } = require('@/services/health');
+                    const healthKitDiagnostics = await getHealthDiagnostics();
+                    const testDiagnostics = getHealthDiagnostics();
+
+                    Alert.alert(
+                      '🔍 HealthKit Diagnostics (TestFlight Build)',
+                      `Platform: ${healthKitDiagnostics.platform}\n` +
+                      `Bundle ID: ${healthKitDiagnostics.bundleId}\n` +
+                      `Expo Go: ${healthKitDiagnostics.isExpoGo ? '❌ BAD' : '✅ GOOD'}\n` +
+                      `Development: ${healthKitDiagnostics.isDevelopment ? '❌ BAD (TestFlight should be production)' : '✅ GOOD (TestFlight)'}\n` +
+                      `Module Loaded: ${healthKitDiagnostics.moduleLoaded ? '✅ GOOD' : '❌ BAD - react-native-health not included'}\n` +
+                      `Device Supported: ${healthKitDiagnostics.deviceSupported ? '✅ GOOD' : '❌ BAD - device incompatible'}\n` +
+                      `Entitlements: ${healthKitDiagnostics.entitlementsConfigured ? '✅ GOOD' : '❌ BAD - config issue'}\n\n` +
+                      `🚨 TESTFLIGHT TROUBLESHOOTING:\n\n` +
+                      `If Module Loaded = ❌:\n` +
+                      `• Rebuild: eas build --platform ios --profile testflight --clear-cache\n\n` +
+                      `If Device Supported = ❌:\n` +
+                      `• Test on iPhone 6s+ (iOS 11+)\n` +
+                      `• Different Apple ID\n` +
+                      `• Device restart\n\n` +
+                      `If app not in Health settings:\n` +
+                      `• Tap "Force HealthKit Init" first\n` +
+                      `• Check Settings → Privacy → Health\n` +
+                      `• Force quit and restart app\n` +
+                      `• Delete and reinstall TestFlight build\n\n` +
+                      `📱 CURRENT BUILD STATUS:\n` +
+                      `Build in progress at Expo...\n` +
+                      `Check: https://expo.dev/accounts/samfilipiak/projects/lock-in/builds/b590d246-3399-437f-9ec7-096a20d7207c`
+                    );
+                  } catch (error: any) {
+                    Alert.alert('Error', `Failed to get diagnostics: ${error.message}`);
+                  }
+                }}
+                accessibilityLabel="View HealthKit diagnostics"
+                accessibilityRole="button"
+                accessibilityHint="Shows HealthKit configuration and troubleshooting info"
+              >
+                <View style={styles.settingLeft}>
+                  <View style={[styles.settingIcon, { backgroundColor: colors.status.warning + '20' }]}>
+                    <Ionicons name="information-circle" size={20} color={colors.status.warning} />
+                  </View>
+                  <View>
+                    <Text style={styles.settingLabel}>HealthKit Diagnostics</Text>
+                    <Text style={styles.settingDescription}>
+                      Debug Health data access
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
+
             {/* Privacy Policy */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.settingItem}
               onPress={async () => {
                 const privacyUrl = 'https://lock-in.github.io/'; // Update if using different URL
