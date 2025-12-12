@@ -28,6 +28,7 @@ import { SmartAdBanner } from '@/components/AdBanner';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 import { colors } from '@/utils/colors';
 import { WeeklyRecap } from '@/components/WeeklyRecap';
+import { InviteWidget } from '@/components/InviteWidget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMatchups, getWeeklyScore } from '@/services/supabase';
 import { getLeagueDashboard } from '@/services/league';
