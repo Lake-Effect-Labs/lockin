@@ -505,6 +505,55 @@ export default function DebugScreen() {
             <Ionicons name="refresh" size={20} color={colors.primary[500]} />
             <Text style={styles.secondaryText}>Force HealthKit Init</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              try {
+                // Detailed module loading test
+                let logs: string[] = [];
+                
+                logs.push('=== Module Loading Test ===');
+                
+                try {
+                  const healthModule = require('react-native-health');
+                  logs.push(`✅ require() succeeded`);
+                  logs.push(`typeof healthModule: ${typeof healthModule}`);
+                  logs.push(`healthModule keys: ${healthModule ? Object.keys(healthModule).join(', ') : 'none'}`);
+                  
+                  if (healthModule.default) {
+                    logs.push(`✅ healthModule.default exists`);
+                    logs.push(`typeof default: ${typeof healthModule.default}`);
+                    logs.push(`default keys: ${Object.keys(healthModule.default).slice(0, 10).join(', ')}`);
+                    
+                    if (healthModule.default.initHealthKit) {
+                      logs.push(`✅ initHealthKit function found`);
+                    } else {
+                      logs.push(`❌ initHealthKit NOT found`);
+                    }
+                    
+                    if (healthModule.default.Constants) {
+                      logs.push(`✅ Constants found`);
+                    } else {
+                      logs.push(`❌ Constants NOT found`);
+                    }
+                  } else {
+                    logs.push(`❌ healthModule.default is falsy`);
+                  }
+                } catch (requireError: any) {
+                  logs.push(`❌ require() FAILED: ${requireError.message}`);
+                }
+                
+                Alert.alert('🔬 Module Loading Test', logs.join('\n'));
+              } catch (error: any) {
+                Alert.alert('❌ Test Error', `Failed: ${error.message}`);
+              }
+            }}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bug" size={20} color={colors.status.warning} />
+            <Text style={styles.secondaryText}>Test Module Loading</Text>
+          </TouchableOpacity>
           
           {/* Health Test Results */}
           {healthResults && (
