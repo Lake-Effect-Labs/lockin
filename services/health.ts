@@ -3,9 +3,9 @@ import Constants from 'expo-constants';
 import { FitnessMetrics } from './scoring';
 
 // ============================================
-// HEALTH DATA SERVICE
+// HEALTH DATA SERVICE  
 // iOS-only health data integration via Apple HealthKit
-// Using @kingstinct/react-native-healthkit (Expo-compatible)
+// Using react-native-health (with Expo config plugin)
 // ============================================
 
 export interface HealthPermissions {
@@ -24,34 +24,37 @@ export interface DailyHealthData extends FitnessMetrics {
 const isExpoGo = Constants?.executionEnvironment === 'storeClient';
 
 // Cache the HealthKit module
-let HealthKitModule: any = null;
+let AppleHealthKit: any = null;
 
 /**
- * Get the HealthKit module (cached, lazy-loaded)
+ * Get the Apple HealthKit module (cached, lazy-loaded)
  */
-function getHealthKit(): any {
-  if (!HealthKitModule) {
+function getAppleHealthKit(): any {
+  if (!AppleHealthKit) {
     try {
-      console.log('📦 Loading @kingstinct/react-native-healthkit module...');
-      HealthKitModule = require('@kingstinct/react-native-healthkit');
+      console.log('📦 Loading react-native-health module...');
+      const healthModule = require('react-native-health');
       
-      console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
+      // react-native-health exports as default
+      AppleHealthKit = healthModule.default || healthModule;
+      
+      console.log('✅ react-native-health loaded successfully');
       console.log('📊 Module details:');
-      console.log('   - Type:', typeof HealthKitModule);
-      console.log('   - Null?:', HealthKitModule === null);
+      console.log('   - Type:', typeof AppleHealthKit);
+      console.log('   - Null?:', AppleHealthKit === null);
       
-      if (HealthKitModule) {
-        const keys = Object.keys(HealthKitModule);
+      if (AppleHealthKit) {
+        const keys = Object.keys(AppleHealthKit);
         console.log('   - Export count:', keys.length);
-        console.log('   - Sample keys:', keys.slice(0, 8).join(', '));
-        console.log('   - Has requestAuthorization:', !!HealthKitModule.requestAuthorization);
-        console.log('   - Has isHealthDataAvailable:', !!HealthKitModule.isHealthDataAvailable);
-        console.log('   - Has HKQuantityTypeIdentifier:', !!HealthKitModule.HKQuantityTypeIdentifier);
+        console.log('   - Sample keys:', keys.slice(0, 10).join(', '));
+        console.log('   - Has initHealthKit:', !!AppleHealthKit.initHealthKit);
+        console.log('   - Has isAvailable:', !!AppleHealthKit.isAvailable);
+        console.log('   - Has Constants:', !!AppleHealthKit.Constants);
       }
       
-      return HealthKitModule;
+      return AppleHealthKit;
     } catch (error: any) {
-      console.error('❌ CRITICAL: Failed to load HealthKit module');
+      console.error('❌ CRITICAL: Failed to load react-native-health module');
       console.error('   - Error:', error.message);
       console.error('   - Code:', error.code);
       console.error('');
@@ -60,7 +63,7 @@ function getHealthKit(): any {
       return null;
     }
   }
-  return HealthKitModule;
+  return AppleHealthKit;
 }
 
 /**
@@ -99,57 +102,43 @@ export async function initializeHealth(): Promise<boolean> {
   console.log('   ✅ PASSED: Standalone build');
   console.log('');
 
-  try {
-    // Step 3: Load module
-    console.log('📦 STEP 3: Load HealthKit Module');
-    const HealthKit = getHealthKit();
-    
-    if (!HealthKit) {
-      console.log('   ❌ FAILED: Module returned null');
-      console.log('   💡 Native module not included in build');
-      console.log('='.repeat(60));
-      return false;
-    }
-    console.log('   ✅ PASSED: Module loaded');
-    console.log('');
+  // Step 3: Load module
+  console.log('📦 STEP 3: Load HealthKit Module');
+  const AppleHealthKit = getAppleHealthKit();
+  
+  if (!AppleHealthKit) {
+    console.log('   ❌ FAILED: Module returned null');
+    console.log('   💡 Native module not included in build');
+    console.log('='.repeat(60));
+    return false;
+  }
+  console.log('   ✅ PASSED: Module loaded');
+  console.log('');
 
-    // Step 4: Check device availability
-    console.log('📱 STEP 4: Check HealthKit Device Availability');
-    console.log('   - Calling: HealthKit.isHealthDataAvailable()');
-    const startAvailCheck = Date.now();
-    const isAvailable = await HealthKit.isHealthDataAvailable();
-    const availCheckDuration = Date.now() - startAvailCheck;
-    console.log('   - Duration:', availCheckDuration, 'ms');
-    console.log('   - Result:', isAvailable);
-    console.log('   - Result type:', typeof isAvailable);
-    
-    if (!isAvailable) {
-      console.log('   ❌ FAILED: HealthKit not available on device');
-      console.log('   💡 This should never happen on iPhone 6s+');
-      console.log('='.repeat(60));
-      return false;
-    }
-    console.log('   ✅ PASSED: HealthKit available on device');
-    console.log('');
-
-    // Step 5: Build permissions object
-    console.log('🔐 STEP 5: Build Permission Request');
+  // Step 4: Check if HealthKit is available
+  console.log('📱 STEP 4: Check HealthKit Availability');
+  
+  return new Promise((resolve) => {
+    // Build permissions
     const permissions = {
-      read: [
-        HealthKit.HKQuantityTypeIdentifier.stepCount,
-        HealthKit.HKQuantityTypeIdentifier.distanceWalkingRunning,
-        HealthKit.HKQuantityTypeIdentifier.activeEnergyBurned,
-        HealthKit.HKCategoryTypeIdentifier.sleepAnalysis,
-        HealthKit.HKWorkoutTypeIdentifier.workoutType,
-      ],
+      permissions: {
+        read: [
+          AppleHealthKit.Constants?.Permissions?.StepCount || 'StepCount',
+          AppleHealthKit.Constants?.Permissions?.DistanceWalkingRunning || 'DistanceWalkingRunning',
+          AppleHealthKit.Constants?.Permissions?.ActiveEnergyBurned || 'ActiveEnergyBurned',
+          AppleHealthKit.Constants?.Permissions?.SleepAnalysis || 'SleepAnalysis',
+        ],
+        write: [],
+      },
     };
+
+    console.log('🔐 STEP 5: Build Permission Request');
     console.log('   - Permissions:', JSON.stringify(permissions, null, 2));
-    console.log('   ✅ Permission object created');
     console.log('');
 
-    // Step 6: Request authorization (THIS IS THE CRITICAL STEP)
-    console.log('🚀 STEP 6: Request Authorization');
-    console.log('   - Calling: HealthKit.requestAuthorization()');
+    // Step 6: Initialize HealthKit (THIS SHOWS THE PERMISSION DIALOG)
+    console.log('🚀 STEP 6: Initialize HealthKit');
+    console.log('   - Calling: AppleHealthKit.initHealthKit()');
     console.log('   - Start time:', new Date().toISOString());
     console.log('');
     console.log('   ⏳ WAITING FOR USER INTERACTION...');
@@ -157,330 +146,275 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('');
     
     const startAuthTime = Date.now();
-    const authResult = await HealthKit.requestAuthorization(permissions);
-    const authDuration = Date.now() - startAuthTime;
     
-    console.log('   - End time:', new Date().toISOString());
-    console.log('   - Duration:', authDuration, 'ms');
-    console.log('   - Result:', authResult);
-    console.log('   - Result type:', typeof authResult);
-    console.log('');
-    
-    if (authDuration < 500) {
-      console.log('   ⚠️ WARNING: Call completed in < 500ms');
-      console.log('   💡 This suggests no dialog was shown (should take 2+ seconds)');
-    } else {
-      console.log('   ✅ Duration suggests dialog was shown');
-    }
-    console.log('');
-    
-    console.log('🎉 INITIALIZATION COMPLETE');
-    console.log('');
-    console.log('📝 NEXT STEPS FOR USER:');
-    console.log('   1. Open iOS Settings app');
-    console.log('   2. Go to: Privacy & Security → Health');
-    console.log('   3. Look for "Lock-In" in the list');
-    console.log('   4. OR: Open Health app → Profile → Apps');
-    console.log('');
-    console.log('🔍 CRITICAL QUESTION:');
-    console.log('   Did you see the iOS Health permission dialog?');
-    console.log('   - YES = SUCCESS (Lock-In should be in Health settings)');
-    console.log('   - NO = BUG (permissions not being requested)');
-    console.log('');
-    console.log('='.repeat(60));
-    console.log('');
-    
-    return true;
-  } catch (error: any) {
-    console.log('');
-    console.log('❌ EXCEPTION THROWN DURING INITIALIZATION');
-    console.log('   - Error name:', error.name);
-    console.log('   - Error message:', error.message);
-    console.log('   - Error code:', error.code);
-    console.log('   - Error stack:');
-    console.log(error.stack);
-    console.log('');
-    console.log('='.repeat(60));
-    console.log('');
-    return false;
-  }
+    AppleHealthKit.initHealthKit(permissions, (error: any, results: any) => {
+      const authDuration = Date.now() - startAuthTime;
+      
+      console.log('   - End time:', new Date().toISOString());
+      console.log('   - Duration:', authDuration, 'ms');
+      console.log('   - Error:', error);
+      console.log('   - Results:', results);
+      console.log('');
+      
+      if (error) {
+        console.log('   ❌ INIT FAILED with error');
+        console.log('   Error message:', error);
+        console.log('');
+        console.log('='.repeat(60));
+        resolve(false);
+        return;
+      }
+      
+      if (authDuration < 500) {
+        console.log('   ⚠️ WARNING: Call completed in < 500ms');
+        console.log('   💡 This suggests no dialog was shown (should take 2+ seconds)');
+        console.log('   💡 POSSIBLE CAUSES:');
+        console.log('      1. User previously responded to permission request');
+        console.log('      2. Native module not properly bridged');
+        console.log('      3. Config plugin not applied correctly');
+      } else {
+        console.log('   ✅ Duration suggests dialog was shown');
+      }
+      console.log('');
+      
+      console.log('🎉 INITIALIZATION COMPLETE');
+      console.log('');
+      console.log('📝 NEXT STEPS FOR USER:');
+      console.log('   1. Open iOS Settings app');
+      console.log('   2. Go to: Privacy & Security → Health');
+      console.log('   3. Look for "Lock-In" in the list');
+      console.log('   4. OR: Open Health app → Profile → Apps');
+      console.log('');
+      console.log('🔍 CRITICAL QUESTION:');
+      console.log('   Did you see the iOS Health permission dialog?');
+      console.log('   - YES = SUCCESS (Lock-In should be in Health settings)');
+      console.log('   - NO = BUG (permissions not being requested)');
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('');
+      
+      resolve(true);
+    });
+  });
 }
 
 /**
- * Check if health data is available on this platform (iOS only)
+ * Check if health services are available
  */
 export function isHealthAvailable(): boolean {
-  return Platform.OS === 'ios' && !isExpoGo;
-}
-
-/**
- * Check current health permissions (iOS only)
- */
-export async function checkHealthPermissions(): Promise<HealthPermissions> {
-  const defaultPermissions: HealthPermissions = {
-    steps: false,
-    sleep: false,
-    calories: false,
-    workouts: false,
-    distance: false,
-  };
-
-  if (Platform.OS !== 'ios' || isExpoGo) {
-    return defaultPermissions;
+  if (Platform.OS !== 'ios') {
+    return false;
   }
-
-  try {
-    const HealthKit = getHealthKit();
-    if (!HealthKit) return defaultPermissions;
-
-    // @kingstinct/react-native-healthkit doesn't expose individual permission status
-    // iOS HealthKit API intentionally doesn't reveal if permissions were granted
-    // We assume if initialization succeeded, basic permissions are available
-    return {
-      steps: true,
-      sleep: true,
-      calories: true,
-      workouts: true,
-      distance: true,
-    };
-  } catch (error) {
-    console.error('Failed to check permissions:', error);
-    return defaultPermissions;
-  }
-}
-
-/**
- * Get health data for a specific date (iOS only)
- */
-export async function getDailyHealthData(date: Date): Promise<DailyHealthData> {
-  const dateString = date.toISOString().split('T')[0];
   
-  if (Platform.OS !== 'ios' || isExpoGo) {
-    return {
-      date: dateString,
-      steps: 0,
-      sleepHours: 0,
-      calories: 0,
-      workouts: 0,
-      distance: 0,
-    };
+  if (isExpoGo) {
+    return false;
   }
 
-  try {
-    const HealthKit = getHealthKit();
-    if (!HealthKit) {
-      return {
-        date: dateString,
-        steps: 0,
-        sleepHours: 0,
-        calories: 0,
-        workouts: 0,
-        distance: 0,
-      };
-    }
+  const AppleHealthKit = getAppleHealthKit();
+  return AppleHealthKit !== null;
+}
 
+/**
+ * Get daily steps for a date
+ */
+export async function getDailySteps(date: Date = new Date()): Promise<number> {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) {
+    console.log('⚠️ HealthKit not available, returning 0 steps');
+    return 0;
+  }
+
+  return new Promise((resolve) => {
+    const options = {
+      date: date.toISOString(),
+      includeManuallyAdded: true,
+    };
+
+    AppleHealthKit.getStepCount(options, (err: any, results: any) => {
+      if (err) {
+        console.error('❌ Error getting steps:', err);
+        resolve(0);
+        return;
+      }
+      resolve(results?.value || 0);
+    });
+  });
+}
+
+/**
+ * Get sleep hours for a date  
+ */
+export async function getDailySleep(date: Date = new Date()): Promise<number> {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) {
+    console.log('⚠️ HealthKit not available, returning 0 sleep hours');
+    return 0;
+  }
+
+  return new Promise((resolve) => {
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
     
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch all metrics in parallel
-    const [steps, distance, calories, sleep, workouts] = await Promise.all([
-      getSteps(HealthKit, startDate, endDate),
-      getDistance(HealthKit, startDate, endDate),
-      getCalories(HealthKit, startDate, endDate),
-      getSleep(HealthKit, startDate, endDate),
-      getWorkouts(HealthKit, startDate, endDate),
-    ]);
-
-    return {
-      date: dateString,
-      steps,
-      sleepHours: sleep,
-      calories,
-      workouts,
-      distance,
+    const options = {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
     };
-  } catch (error) {
-    console.error(`Failed to get health data for ${dateString}:`, error);
-    return {
-      date: dateString,
-      steps: 0,
-      sleepHours: 0,
-      calories: 0,
-      workouts: 0,
-      distance: 0,
-    };
-  }
-}
 
-async function getSteps(HealthKit: any, startDate: Date, endDate: Date): Promise<number> {
-  try {
-    const result = await HealthKit.queryQuantitySamples(
-      HealthKit.HKQuantityTypeIdentifier.stepCount,
-      {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
+    AppleHealthKit.getSleepSamples(options, (err: any, results: any[]) => {
+      if (err) {
+        console.error('❌ Error getting sleep:', err);
+        resolve(0);
+        return;
       }
-    );
-    
-    const total = result.reduce((sum: number, sample: any) => sum + (sample.quantity || 0), 0);
-    return Math.round(total);
-  } catch (error) {
-    console.error('Error fetching steps:', error);
-    return 0;
-  }
-}
 
-async function getDistance(HealthKit: any, startDate: Date, endDate: Date): Promise<number> {
-  try {
-    const result = await HealthKit.queryQuantitySamples(
-      HealthKit.HKQuantityTypeIdentifier.distanceWalkingRunning,
-      {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
+      if (!results || results.length === 0) {
+        resolve(0);
+        return;
       }
-    );
-    
-    const totalMeters = result.reduce((sum: number, sample: any) => sum + (sample.quantity || 0), 0);
-    // Convert meters to miles
-    const miles = totalMeters / 1609.344;
-    return Math.round(miles * 100) / 100;
-  } catch (error) {
-    console.error('Error fetching distance:', error);
-    return 0;
-  }
-}
 
-async function getCalories(HealthKit: any, startDate: Date, endDate: Date): Promise<number> {
-  try {
-    const result = await HealthKit.queryQuantitySamples(
-      HealthKit.HKQuantityTypeIdentifier.activeEnergyBurned,
-      {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
-      }
-    );
-    
-    const total = result.reduce((sum: number, sample: any) => sum + (sample.quantity || 0), 0);
-    return Math.round(total);
-  } catch (error) {
-    console.error('Error fetching calories:', error);
-    return 0;
-  }
-}
-
-async function getSleep(HealthKit: any, startDate: Date, endDate: Date): Promise<number> {
-  try {
-    const result = await HealthKit.queryCategorySamples(
-      HealthKit.HKCategoryTypeIdentifier.sleepAnalysis,
-      {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
-      }
-    );
-    
-    let totalMinutes = 0;
-    
-    for (const sample of result) {
-      // Only count asleep time (not in bed time)
-      if (sample.value === HealthKit.HKCategoryValueSleepAnalysis.asleep) {
+      // Sum up all sleep periods (in hours)
+      const totalMinutes = results.reduce((sum, sample) => {
         const start = new Date(sample.startDate).getTime();
         const end = new Date(sample.endDate).getTime();
-        const minutes = (end - start) / (1000 * 60);
-        totalMinutes += minutes;
-      }
-    }
-    
-    const hours = totalMinutes / 60;
-    return Math.round(hours * 100) / 100;
-  } catch (error) {
-    console.error('Error fetching sleep:', error);
-    return 0;
-  }
-}
+        return sum + (end - start) / (1000 * 60);
+      }, 0);
 
-async function getWorkouts(HealthKit: any, startDate: Date, endDate: Date): Promise<number> {
-  try {
-    const result = await HealthKit.queryWorkoutSamples({
-      from: startDate.toISOString(),
-      to: endDate.toISOString(),
+      resolve(totalMinutes / 60);
     });
-    
-    return result?.length || 0;
-  } catch (error) {
-    console.error('Error fetching workouts:', error);
+  });
+}
+
+/**
+ * Get active calories for a date
+ */
+export async function getDailyCalories(date: Date = new Date()): Promise<number> {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) {
+    console.log('⚠️ HealthKit not available, returning 0 calories');
     return 0;
   }
+
+  return new Promise((resolve) => {
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    const options = {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
+
+    AppleHealthKit.getActiveEnergyBurned(options, (err: any, results: any) => {
+      if (err) {
+        console.error('❌ Error getting calories:', err);
+        resolve(0);
+        return;
+      }
+      resolve(results?.value || 0);
+    });
+  });
 }
 
 /**
- * Get health data for a date range
+ * Get distance walked/run for a date
  */
-export async function getHealthDataRange(startDate: Date, endDate: Date): Promise<DailyHealthData[]> {
-  const data: DailyHealthData[] = [];
-  const current = new Date(startDate);
-  
-  while (current <= endDate) {
-    try {
-      const dayData = await getDailyHealthData(new Date(current));
-      data.push(dayData);
-    } catch (error) {
-      console.error(`Failed to get data for ${current.toISOString()}:`, error);
-    }
-    current.setDate(current.getDate() + 1);
+export async function getDailyDistance(date: Date = new Date()): Promise<number> {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) {
+    console.log('⚠️ HealthKit not available, returning 0 distance');
+    return 0;
   }
-  
-  return data;
+
+  return new Promise((resolve) => {
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    const options = {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      unit: 'mile',
+    };
+
+    AppleHealthKit.getDistanceWalkingRunning(options, (err: any, results: any) => {
+      if (err) {
+        console.error('❌ Error getting distance:', err);
+        resolve(0);
+        return;
+      }
+      resolve(results?.value || 0);
+    });
+  });
 }
 
 /**
- * Get weekly health data (current week - Monday to today)
+ * Get all daily fitness metrics
  */
-export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
-  const { getStartOfWeekMonday } = require('../utils/dates');
-  const today = new Date();
-  const startOfWeek = getStartOfWeekMonday(today);
+export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHealthData> {
+  console.log('📊 Getting daily metrics for', date.toLocaleDateString());
   
-  return getHealthDataRange(startOfWeek, today);
-}
+  const [steps, sleep, calories, distance] = await Promise.all([
+    getDailySteps(date),
+    getDailySleep(date),
+    getDailyCalories(date),
+    getDailyDistance(date),
+  ]);
 
-/**
- * Comprehensive health diagnostics for debugging TestFlight issues
- */
-export async function getHealthDiagnostics(): Promise<{
-  platform: string;
-  isExpoGo: boolean;
-  isDevelopment: boolean;
-  moduleLoaded: boolean;
-  deviceSupported: boolean;
-  initializationAttempted: boolean;
-  entitlementsConfigured: boolean;
-  bundleId: string;
-}> {
-  const HealthKit = getHealthKit();
-  
-  let deviceSupported = false;
-  if (HealthKit && Platform.OS === 'ios' && !isExpoGo) {
-    try {
-      deviceSupported = await HealthKit.isHealthDataAvailable();
-    } catch (error) {
-      console.error('Device support check failed:', error);
-    }
-  }
+  console.log('📊 Results:', { steps, sleep, calories, distance });
 
   return {
-    platform: Platform.OS,
-    isExpoGo: Constants.executionEnvironment === 'storeClient',
-    isDevelopment: __DEV__,
-    moduleLoaded: !!HealthKit,
-    deviceSupported,
-    initializationAttempted: false,
-    entitlementsConfigured: true,
-    bundleId: Constants.expoConfig?.ios?.bundleIdentifier || 'unknown'
+    date: date.toISOString().split('T')[0],
+    steps,
+    sleepHours: sleep,
+    calories,
+    distance: distance,
+    workouts: 0, // TODO: Implement workout tracking
   };
 }
 
-// Fake data mode flag (exported for compatibility)
-export const fakeMode = false;
+/**
+ * Check health permissions status
+ */
+export async function checkHealthPermissions(): Promise<HealthPermissions> {
+  // Note: iOS doesn't allow querying permission status for privacy
+  // We can only know if we can read data by trying
+  return {
+    steps: false,
+    sleep: false,
+    calories: false,
+    workouts: false,
+    distance: false,
+  };
+}
+
+/**
+ * Get fake/mock health data for testing
+ */
+export function getFakeHealthData(date: Date = new Date()): DailyHealthData {
+  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
+  const seed = dayOfYear;
+  
+  return {
+    date: date.toISOString().split('T')[0],
+    steps: 8000 + (seed * 137) % 4000,
+    sleepHours: 6 + (seed * 73) % 3,
+    calories: 400 + (seed * 97) % 300,
+    distance: 3 + (seed * 53) % 5,
+    workouts: (seed * 17) % 2,
+  };
+}
+
+// For testing/development mode
+export let fakeMode = false;
+
+export function setFakeMode(enabled: boolean) {
+  fakeMode = enabled;
+  console.log(`🎭 Fake health data mode: ${enabled ? 'ON' : 'OFF'}`);
+}
