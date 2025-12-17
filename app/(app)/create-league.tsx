@@ -13,7 +13,19 @@ import {
   Share,
   Switch,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+// Lazy load Clipboard to prevent crashes at module load time
+let Clipboard: any = null;
+function getClipboard() {
+  if (!Clipboard) {
+    try {
+      Clipboard = require('expo-clipboard');
+    } catch (error) {
+      console.warn('Clipboard not available:', error);
+      Clipboard = null;
+    }
+  }
+  return Clipboard;
+}
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,7 +119,10 @@ export default function CreateLeagueScreen() {
     if (!createdLeague) return;
     
     try {
-      await Clipboard.setStringAsync(createdLeague.join_code);
+      const clipboard = getClipboard();
+      if (clipboard) {
+        await clipboard.setStringAsync(createdLeague.join_code);
+      }
       Alert.alert('Copied!', `Join code "${createdLeague.join_code}" has been copied to your clipboard. Share it with friends!`);
     } catch (error) {
       Alert.alert('Error', 'Failed to copy code. Please try again.');

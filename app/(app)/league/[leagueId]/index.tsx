@@ -10,7 +10,19 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+// Lazy load Clipboard to prevent crashes at module load time
+let Clipboard: any = null;
+function getClipboard() {
+  if (!Clipboard) {
+    try {
+      Clipboard = require('expo-clipboard');
+    } catch (error) {
+      console.warn('Clipboard not available:', error);
+      Clipboard = null;
+    }
+  }
+  return Clipboard;
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -166,7 +178,10 @@ export default function LeagueDashboardScreen() {
     if (!currentDashboard) return;
     
     const joinCode = currentDashboard.league.join_code;
-    await Clipboard.setStringAsync(joinCode);
+    const clipboard = getClipboard();
+    if (clipboard) {
+      await clipboard.setStringAsync(joinCode);
+    }
     Alert.alert('Copied!', `Join code "${joinCode}" copied to clipboard`);
   };
   

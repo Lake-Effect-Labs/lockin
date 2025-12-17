@@ -2,7 +2,19 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Redirect, useRouter, useSegments } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Linking from 'expo-linking';
+// Lazy load Linking to prevent crashes at module load time
+let Linking: any = null;
+function getLinking() {
+  if (!Linking) {
+    try {
+      Linking = require('expo-linking');
+    } catch (error) {
+      console.warn('Linking not available:', error);
+      Linking = null;
+    }
+  }
+  return Linking;
+}
 import { useAuthStore } from '@/store/useAuthStore';
 import { colors } from '@/utils/colors';
 
@@ -18,28 +30,34 @@ export default function Index() {
   
   // Handle deep links
   useEffect(() => {
+    const linking = getLinking();
+    if (!linking) return;
+    
     // Handle initial URL (app opened from link)
-    Linking.getInitialURL().then((url) => {
+    linking.getInitialURL().then((url: string | null) => {
       if (url) {
         handleDeepLink(url);
       }
     });
     
     // Handle URL while app is running
-    const subscription = Linking.addEventListener('url', (event) => {
+    const subscription = linking.addEventListener('url', (event: { url: string }) => {
       handleDeepLink(event.url);
     });
     
     return () => {
-      subscription.remove();
+      subscription?.remove();
     };
   }, [user, isInitialized]);
   
   const handleDeepLink = (url: string) => {
     if (!isInitialized) return; // Wait for auth to initialize
     
+    const linking = getLinking();
+    if (!linking) return;
+    
     try {
-      const parsed = Linking.parse(url);
+      const parsed = linking.parse(url);
 
       // Handle join league deep link: lockin://join?code=ABC123
       if (parsed.path === 'join' && parsed.queryParams?.code) {

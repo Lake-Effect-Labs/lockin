@@ -9,7 +9,8 @@ export * from './simulation';
 export * from './errorHandler';
 export * from './dailySync';
 export * from './realtimeSync';
-export * from './backgroundSync';
+// backgroundSync removed from barrel export to prevent eager loading of BackgroundFetch/TaskManager
+// Import directly from './backgroundSync' if needed
 export * from './matchupMonitor';
 export * from './healthTest';
 

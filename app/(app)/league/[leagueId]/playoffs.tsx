@@ -10,7 +10,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import ConfettiCannon from 'react-native-confetti-cannon';
+// Lazy load ConfettiCannon to prevent crashes at module load time
+let ConfettiCannon: any = null;
+function getConfettiCannon() {
+  if (!ConfettiCannon) {
+    try {
+      ConfettiCannon = require('react-native-confetti-cannon').default;
+    } catch (error) {
+      console.warn('ConfettiCannon not available:', error);
+      ConfettiCannon = null;
+    }
+  }
+  return ConfettiCannon;
+}
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
 import { BracketView, CompactBracket } from '@/components/BracketView';
@@ -109,15 +121,15 @@ export default function PlayoffsScreen() {
   
   return (
     <SafeAreaView style={styles.container}>
-      {showConfetti && (
-        <ConfettiCannon
-          ref={confettiRef}
-          count={200}
-          origin={{ x: width / 2, y: 0 }}
-          autoStart={false}
-          fadeOut
-          colors={[colors.sport.gold, colors.primary[500], colors.secondary[500], '#fff']}
-        />
+      {showConfetti && getConfettiCannon() && (
+        React.createElement(getConfettiCannon(), {
+          ref: confettiRef,
+          count: 200,
+          origin: { x: width / 2, y: 0 },
+          autoStart: false,
+          fadeOut: true,
+          colors: [colors.sport.gold, colors.primary[500], colors.secondary[500], '#fff']
+        })
       )}
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>

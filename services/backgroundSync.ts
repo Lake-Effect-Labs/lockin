@@ -4,8 +4,6 @@
 // Syncs health data when app is in background/closed
 // ============================================
 
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
@@ -14,6 +12,25 @@ import { aggregateWeeklyMetrics, calculatePoints, FitnessMetrics } from './scori
 import { upsertWeeklyScore, getUserLeagues, getLeague, getWeeklyScore } from './supabase';
 import { generateWeekData } from '@/utils/fakeData';
 import { sendLocalNotification } from './notifications';
+
+// Lazy load BackgroundFetch and TaskManager to prevent crashes at module load time
+let BackgroundFetch: any = null;
+let TaskManager: any = null;
+let modulesLoaded = false;
+
+function loadBackgroundModules() {
+  if (modulesLoaded) return;
+  modulesLoaded = true;
+  
+  try {
+    BackgroundFetch = require('expo-background-fetch');
+    TaskManager = require('expo-task-manager');
+  } catch (error) {
+    console.warn('Background modules not available:', error);
+    BackgroundFetch = null;
+    TaskManager = null;
+  }
+}
 
 // Check if we're in Expo Go (background fetch doesn't work in Expo Go)
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
@@ -31,25 +48,39 @@ const FAKE_MODE_KEY = 'lockin_fake_mode';
 // TASK DEFINITION
 // ============================================
 
-// Define the background task
-TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
-  console.log('🔄 [Background] Running sync task...');
+// Define the background task - lazily when needed
+let taskDefined = false;
+
+function initializeBackgroundTask() {
+  if (taskDefined) return;
+  
+  loadBackgroundModules();
+  if (!TaskManager || !BackgroundFetch) return;
   
   try {
-    const result = await performBackgroundSync();
-    
-    if (result.success) {
-      console.log('✅ [Background] Sync completed:', result.points, 'points');
-      return BackgroundFetch.BackgroundFetchResult.NewData;
-    } else {
-      console.log('⚠️ [Background] Sync skipped:', result.reason);
-      return BackgroundFetch.BackgroundFetchResult.NoData;
-    }
+    TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
+      console.log('🔄 [Background] Running sync task...');
+      
+      try {
+        const result = await performBackgroundSync();
+        
+        if (result.success) {
+          console.log('✅ [Background] Sync completed:', result.points, 'points');
+          return BackgroundFetch.BackgroundFetchResult.NewData;
+        } else {
+          console.log('⚠️ [Background] Sync skipped:', result.reason);
+          return BackgroundFetch.BackgroundFetchResult.NoData;
+        }
+      } catch (error) {
+        console.error('❌ [Background] Sync failed:', error);
+        return BackgroundFetch.BackgroundFetchResult.Failed;
+      }
+    });
+    taskDefined = true;
   } catch (error) {
-    console.error('❌ [Background] Sync failed:', error);
-    return BackgroundFetch.BackgroundFetchResult.Failed;
+    console.warn('Failed to define background task:', error);
   }
-});
+}
 
 // ============================================
 // BACKGROUND SYNC LOGIC
@@ -176,6 +207,15 @@ export async function registerBackgroundSync(userId: string, fakeMode: boolean =
     return false;
   }
   
+  // Initialize background task and load modules
+  initializeBackgroundTask();
+  loadBackgroundModules();
+  
+  if (!BackgroundFetch || !TaskManager) {
+    console.log('⚠️ Background modules not available');
+    return false;
+  }
+  
   try {
     // Check if background fetch is available first
     const status = await BackgroundFetch.getStatusAsync();
@@ -219,6 +259,12 @@ export async function registerBackgroundSync(userId: string, fakeMode: boolean =
  * Unregister background sync task
  */
 export async function unregisterBackgroundSync(): Promise<void> {
+  loadBackgroundModules();
+  
+  if (!BackgroundFetch || !TaskManager) {
+    return;
+  }
+
   try {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_SYNC_TASK);
     
@@ -239,10 +285,19 @@ export async function unregisterBackgroundSync(): Promise<void> {
  */
 export async function isBackgroundSyncAvailable(): Promise<{
   available: boolean;
-  status: BackgroundFetch.BackgroundFetchStatus | null;
+  status: any;
 }> {
   // Not available in Expo Go
   if (isExpoGo) {
+    return {
+      available: false,
+      status: null,
+    };
+  }
+  
+  loadBackgroundModules();
+  
+  if (!BackgroundFetch) {
     return {
       available: false,
       status: null,
@@ -267,14 +322,17 @@ export async function isBackgroundSyncAvailable(): Promise<{
 /**
  * Get background sync status description
  */
-export function getBackgroundSyncStatusText(status: BackgroundFetch.BackgroundFetchStatus | null): string {
-  if (status === null) return 'Unknown';
+export function getBackgroundSyncStatusText(status: any): string {
+  loadBackgroundModules();
+  
+  if (status === null || !BackgroundFetch) return 'Unknown';
+  
   switch (status) {
-    case BackgroundFetch.BackgroundFetchStatus.Available:
+    case BackgroundFetch?.BackgroundFetchStatus?.Available:
       return 'Available';
-    case BackgroundFetch.BackgroundFetchStatus.Denied:
+    case BackgroundFetch?.BackgroundFetchStatus?.Denied:
       return 'Denied - Enable in Settings';
-    case BackgroundFetch.BackgroundFetchStatus.Restricted:
+    case BackgroundFetch?.BackgroundFetchStatus?.Restricted:
       return 'Restricted by system';
     default:
       return 'Unknown';
@@ -292,6 +350,12 @@ export async function getLastBackgroundSyncTime(): Promise<string | null> {
  * Check if background sync is registered
  */
 export async function isBackgroundSyncRegistered(): Promise<boolean> {
+  loadBackgroundModules();
+  
+  if (!TaskManager) {
+    return false;
+  }
+  
   return TaskManager.isTaskRegisteredAsync(BACKGROUND_SYNC_TASK);
 }
 

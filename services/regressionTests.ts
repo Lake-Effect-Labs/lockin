@@ -20,8 +20,33 @@ function generateJoinCode(): string {
   }
   return result;
 }
-import * as Clipboard from 'expo-clipboard';
-import * as Linking from 'expo-linking';
+// Lazy load Clipboard and Linking to prevent crashes at module load time
+let Clipboard: any = null;
+let Linking: any = null;
+
+function getClipboard() {
+  if (!Clipboard) {
+    try {
+      Clipboard = require('expo-clipboard');
+    } catch (error) {
+      console.warn('Clipboard not available:', error);
+      Clipboard = null;
+    }
+  }
+  return Clipboard;
+}
+
+function getLinking() {
+  if (!Linking) {
+    try {
+      Linking = require('expo-linking');
+    } catch (error) {
+      console.warn('Linking not available:', error);
+      Linking = null;
+    }
+  }
+  return Linking;
+}
 
 // ============================================
 // DATABASE OPERATION TESTS
@@ -268,8 +293,12 @@ export async function runNavigationTests(): Promise<TestResult[]> {
   // Test: Clipboard functionality (if available)
   try {
     const testText = 'TEST123';
-    await Clipboard.setStringAsync(testText);
-    const copied = await Clipboard.getStringAsync();
+    const clipboard = getClipboard();
+    if (!clipboard) {
+      throw new Error('Clipboard not available');
+    }
+    await clipboard.setStringAsync(testText);
+    const copied = await clipboard.getStringAsync();
     
     results.push({
       name: 'Clipboard Functionality',
