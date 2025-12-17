@@ -266,25 +266,23 @@ export default function SettingsScreen() {
               />
             </View>
             
-            {__DEV__ && (
-              <TouchableOpacity 
-                style={styles.settingItem}
-                onPress={() => router.push('/(app)/debug')}
-              >
-                <View style={styles.settingLeft}>
-                  <View style={[styles.settingIcon, { backgroundColor: colors.secondary[500] + '20' }]}>
-                    <Ionicons name="bug-outline" size={20} color={colors.secondary[500]} />
-                  </View>
-                  <View>
-                    <Text style={styles.settingLabel}>Debug & Testing</Text>
-                    <Text style={styles.settingDescription}>
-                      Run validation tests
-                    </Text>
-                  </View>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={() => router.push('/(app)/debug')}
+            >
+              <View style={styles.settingLeft}>
+                <View style={[styles.settingIcon, { backgroundColor: colors.secondary[500] + '20' }]}>
+                  <Ionicons name="bug-outline" size={20} color={colors.secondary[500]} />
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            )}
+                <View>
+                  <Text style={styles.settingLabel}>Debug & Testing</Text>
+                  <Text style={styles.settingDescription}>
+                    Run validation tests
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            </TouchableOpacity>
             
             {/* HealthKit Diagnostics */}
             {Platform.OS === 'ios' && (
