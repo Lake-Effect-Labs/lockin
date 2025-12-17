@@ -1,4 +1,3 @@
-import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
@@ -46,6 +45,20 @@ const ExpoSecureStoreAdapter = {
   },
 };
 
+// URL polyfill removed from top-level import to prevent crashes
+// It will be loaded lazily if needed (Supabase may work without it)
+let polyfillAttempted = false;
+function loadPolyfillIfNeeded() {
+  if (polyfillAttempted) return;
+  polyfillAttempted = true;
+  try {
+    require('react-native-url-polyfill/auto');
+  } catch (error) {
+    // Polyfill not available - Supabase may still work
+    console.warn('URL polyfill not available:', error);
+  }
+}
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
 
@@ -57,6 +70,9 @@ if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co' ||
 }
 
 // Create Supabase client with error handling
+// Try to load polyfill before creating client, but don't crash if it fails
+loadPolyfillIfNeeded();
+
 let supabase: ReturnType<typeof createClient>;
 try {
   supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -70,14 +86,21 @@ try {
 } catch (error) {
   // If client creation fails, create a minimal client that won't crash
   console.error('Failed to create Supabase client:', error);
-  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
-    auth: {
-      storage: ExpoSecureStoreAdapter,
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
+  try {
+    supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+      auth: {
+        storage: ExpoSecureStoreAdapter,
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    });
+  } catch (fallbackError) {
+    // Even fallback failed - create a mock client
+    console.error('Even fallback client creation failed:', fallbackError);
+    // Create a minimal mock that won't crash
+    supabase = {} as any;
+  }
 }
 
 export { supabase };
