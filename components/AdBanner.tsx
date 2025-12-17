@@ -19,23 +19,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Conditionally import AdMob only when not in Expo Go
+// DO NOT import synchronously - lazy load to prevent crashes
 let BannerAd: any = null;
 let BannerAdSize: any = null;
 let TestIds: any = null;
 let mobileAds: any = null;
+let admobModuleLoaded = false;
 
-// Only import AdMob if we're not in Expo Go
-if (Constants.executionEnvironment !== 'storeClient') {
+/**
+ * Lazy load AdMob module (prevents crashes if module not available)
+ */
+function loadAdMobModule(): boolean {
+  if (admobModuleLoaded) {
+    return !!BannerAd; // Already tried to load
+  }
+
+  admobModuleLoaded = true;
+
   try {
-    const admob = require('react-native-google-mobile-ads');
-    BannerAd = admob.BannerAd;
-    BannerAdSize = admob.BannerAdSize;
-    TestIds = admob.TestIds;
-    mobileAds = admob.mobileAds;
+    if (Constants.executionEnvironment !== 'storeClient') {
+      const admob = require('react-native-google-mobile-ads');
+      BannerAd = admob.BannerAd;
+      BannerAdSize = admob.BannerAdSize;
+      TestIds = admob.TestIds;
+      mobileAds = admob.mobileAds;
+      return true;
+    }
   } catch (error) {
     // AdMob not available - this is expected in some environments
     console.log('AdMob not available in this environment');
   }
+
+  return false;
 }
 
 /**
@@ -51,6 +66,9 @@ function validateAdMobComponents(): {
     TestIds: boolean;
   };
 } {
+  // Try to load AdMob module if not already loaded
+  loadAdMobModule();
+
   const checks = {
     BannerAd: !!BannerAd && typeof BannerAd === 'function',
     BannerAdSize: !!BannerAdSize && typeof BannerAdSize === 'object',

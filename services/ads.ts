@@ -9,17 +9,39 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 // Conditionally import AdMob only when not in Expo Go
+// DO NOT import synchronously - use lazy loading to prevent crashes
 let mobileAds: any = null;
 let MaxAdContentRating: any = null;
+let admobModule: any = null;
 
-try {
-  if (Constants.executionEnvironment !== 'storeClient') {
-    const admob = require('react-native-google-mobile-ads');
-    mobileAds = admob.mobileAds;
-    MaxAdContentRating = admob.MaxAdContentRating;
+/**
+ * Lazy load AdMob module (prevents crashes if module not available)
+ */
+function loadAdMobModule(): { mobileAds: any; MaxAdContentRating: any } | null {
+  if (admobModule !== undefined) {
+    // Already tried to load
+    return admobModule;
   }
-} catch (error) {
-  console.log('AdMob not available in this environment');
+
+  try {
+    if (Constants.executionEnvironment !== 'storeClient') {
+      const admob = require('react-native-google-mobile-ads');
+      admobModule = {
+        mobileAds: admob.mobileAds,
+        MaxAdContentRating: admob.MaxAdContentRating,
+      };
+      mobileAds = admob.mobileAds;
+      MaxAdContentRating = admob.MaxAdContentRating;
+      return admobModule;
+    }
+  } catch (error) {
+    // Module not available - mark as failed
+    admobModule = null;
+    console.log('AdMob not available in this environment');
+  }
+
+  admobModule = null;
+  return null;
 }
 
 /**
@@ -35,6 +57,9 @@ export function validateAdMobAvailability(): {
     notExpoGo: boolean;
   };
 } {
+  // Try to load AdMob module if not already loaded
+  loadAdMobModule();
+
   const checks = {
     moduleLoaded: !!mobileAds && typeof mobileAds === 'function',
     hasAppId: isAdMobConfigured(),
@@ -62,6 +87,9 @@ export function validateAdMobAvailability(): {
  * Returns null if AdMob is not available
  */
 function safeMobileAds(): any {
+  // Try to load AdMob module if not already loaded
+  loadAdMobModule();
+
   if (!mobileAds || typeof mobileAds !== 'function') {
     return null;
   }

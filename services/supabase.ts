@@ -7,24 +7,42 @@ import { Platform } from 'react-native';
 // Custom storage adapter that uses SecureStore on native, AsyncStorage on web
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string): Promise<string | null> => {
-    if (Platform.OS === 'web') {
+    try {
+      if (Platform.OS === 'web') {
+        return AsyncStorage.getItem(key);
+      }
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      // Fallback to AsyncStorage if SecureStore fails
+      console.warn('SecureStore failed, using AsyncStorage:', error);
       return AsyncStorage.getItem(key);
     }
-    return SecureStore.getItemAsync(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
-    if (Platform.OS === 'web') {
+    try {
+      if (Platform.OS === 'web') {
+        await AsyncStorage.setItem(key, value);
+        return;
+      }
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      // Fallback to AsyncStorage if SecureStore fails
+      console.warn('SecureStore failed, using AsyncStorage:', error);
       await AsyncStorage.setItem(key, value);
-      return;
     }
-    await SecureStore.setItemAsync(key, value);
   },
   removeItem: async (key: string): Promise<void> => {
-    if (Platform.OS === 'web') {
+    try {
+      if (Platform.OS === 'web') {
+        await AsyncStorage.removeItem(key);
+        return;
+      }
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      // Fallback to AsyncStorage if SecureStore fails
+      console.warn('SecureStore failed, using AsyncStorage:', error);
       await AsyncStorage.removeItem(key);
-      return;
     }
-    await SecureStore.deleteItemAsync(key);
   },
 };
 
@@ -38,14 +56,31 @@ if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co' ||
   // Don't throw here - let the app start and show error in UI
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: ExpoSecureStoreAdapter,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+// Create Supabase client with error handling
+let supabase: ReturnType<typeof createClient>;
+try {
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: ExpoSecureStoreAdapter,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
+} catch (error) {
+  // If client creation fails, create a minimal client that won't crash
+  console.error('Failed to create Supabase client:', error);
+  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+    auth: {
+      storage: ExpoSecureStoreAdapter,
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+export { supabase };
 
 // ============================================
 // TYPE DEFINITIONS

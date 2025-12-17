@@ -137,41 +137,69 @@ export async function clearStoredCrashes(): Promise<void> {
 export function setupGlobalErrorHandlers(): void {
   try {
     // Handle uncaught errors (React Native)
-    if (global.ErrorUtils) {
-      const originalHandler = global.ErrorUtils.getGlobalHandler();
-      global.ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-        // Report crash
-        reportCrash(error, { type: 'uncaughtError', isFatal: isFatal || false }).catch(() => {
-          // Ignore if reporting fails
+    // Only set up if ErrorUtils exists and is accessible
+    if (typeof global !== 'undefined' && global.ErrorUtils && typeof global.ErrorUtils.getGlobalHandler === 'function') {
+      try {
+        const originalHandler = global.ErrorUtils.getGlobalHandler();
+        global.ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+          try {
+            // Report crash
+            reportCrash(error, { type: 'uncaughtError', isFatal: isFatal || false }).catch(() => {
+              // Ignore if reporting fails
+            });
+          } catch (reportError) {
+            // Don't crash if crash reporting fails
+          }
+          
+          // Call original handler if it exists
+          if (originalHandler && typeof originalHandler === 'function') {
+            try {
+              originalHandler(error, isFatal);
+            } catch (handlerError) {
+              // Ignore if original handler fails
+            }
+          }
         });
-        
-        // Call original handler if it exists
-        if (originalHandler) {
-          originalHandler(error, isFatal);
-        }
-      });
+      } catch (setupError) {
+        // Don't crash if handler setup fails
+        console.warn('Could not set up ErrorUtils handler:', setupError);
+      }
     }
 
-    // Handle unhandled promise rejections
-    if (typeof global !== 'undefined') {
-      const originalUnhandledRejection = (global as any).onunhandledrejection;
-      (global as any).onunhandledrejection = (event: any) => {
-        if (event && event.reason) {
-          const error = event.reason instanceof Error 
-            ? event.reason 
-            : new Error(String(event.reason));
-          reportCrash(error, { type: 'unhandledRejection' }).catch(() => {
-            // Ignore if reporting fails
-          });
-        }
-        if (originalUnhandledRejection) {
-          originalUnhandledRejection(event);
-        }
-      };
+    // Handle unhandled promise rejections (if supported)
+    if (typeof global !== 'undefined' && typeof (global as any).onunhandledrejection !== 'undefined') {
+      try {
+        const originalUnhandledRejection = (global as any).onunhandledrejection;
+        (global as any).onunhandledrejection = (event: any) => {
+          try {
+            if (event && event.reason) {
+              const error = event.reason instanceof Error 
+                ? event.reason 
+                : new Error(String(event.reason));
+              reportCrash(error, { type: 'unhandledRejection' }).catch(() => {
+                // Ignore if reporting fails
+              });
+            }
+          } catch (reportError) {
+            // Don't crash if crash reporting fails
+          }
+          
+          if (originalUnhandledRejection && typeof originalUnhandledRejection === 'function') {
+            try {
+              originalUnhandledRejection(event);
+            } catch (handlerError) {
+              // Ignore if original handler fails
+            }
+          }
+        };
+      } catch (setupError) {
+        // Don't crash if rejection handler setup fails
+        console.warn('Could not set up unhandled rejection handler:', setupError);
+      }
     }
   } catch (error) {
     // Don't crash if error handler setup fails
-    console.error('Failed to set up global error handlers:', error);
+    console.warn('Failed to set up global error handlers:', error);
   }
 }
 

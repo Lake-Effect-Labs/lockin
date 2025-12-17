@@ -36,7 +36,12 @@ export default function RootLayout() {
   
   useEffect(() => {
     // Set up global error handlers first (before anything else)
-    setupGlobalErrorHandlers();
+    // Wrap in try-catch to prevent crashes during setup
+    try {
+      setupGlobalErrorHandlers();
+    } catch (error) {
+      console.warn('Failed to set up error handlers:', error);
+    }
 
     // Initialize app on mount
     const init = async () => {
