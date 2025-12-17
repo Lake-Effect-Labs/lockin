@@ -578,6 +578,92 @@ export default function DebugScreen() {
           )}
         </View>
 
+        {/* League Admin Tools */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>⚙️ League Admin Tools</Text>
+          
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                if (!currentDashboard?.league) {
+                  Alert.alert('Error', 'No league loaded. Go to a league first.');
+                  return;
+                }
+                
+                const league = currentDashboard.league;
+                
+                if (!currentDashboard.isAdmin) {
+                  Alert.alert('Error', 'You must be a league admin to fix the start date.');
+                  return;
+                }
+                
+                if (!league.start_date) {
+                  Alert.alert('Error', 'League has no start date set yet.');
+                  return;
+                }
+                
+                const { getNextMonday } = require('@/utils/dates');
+                const correctNextMonday = getNextMonday();
+                const correctDateStr = correctNextMonday.toISOString().split('T')[0];
+                
+                Alert.alert(
+                  '🔧 Fix League Start Date',
+                  `Current start date: ${league.start_date}\n` +
+                  `Correct start date should be: ${correctDateStr}\n\n` +
+                  `This will reset the league to start on the next Monday and regenerate matchups.\n\n` +
+                  `Continue?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Fix It',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { supabase } = require('@/services/supabase');
+                          
+                          // Update start date and reset to week 1
+                          const { error: updateError } = await supabase
+                            .from('leagues')
+                            .update({ 
+                              start_date: correctDateStr,
+                              current_week: 1 
+                            })
+                            .eq('id', league.id);
+                          
+                          if (updateError) throw updateError;
+                          
+                          // Regenerate matchups
+                          const { startLeagueSeason } = require('@/services/supabase');
+                          await startLeagueSeason(league.id);
+                          
+                          // Refresh dashboard
+                          await fetchDashboard(league.id, user!.id);
+                          
+                          Alert.alert(
+                            '✅ Success!',
+                            `League start date fixed!\n\n` +
+                            `New start date: ${correctDateStr}\n` +
+                            `Matchups regenerated for Week 1.`
+                          );
+                        } catch (error: any) {
+                          Alert.alert('❌ Error', `Failed to fix start date: ${error.message}`);
+                        }
+                      }
+                    }
+                  ]
+                );
+              } catch (error: any) {
+                Alert.alert('❌ Error', error.message);
+              }
+            }}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="calendar" size={20} color={colors.primary[500]} />
+            <Text style={styles.secondaryText}>Fix League Start Date</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* AdMob Safety Check */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📱 AdMob Safety</Text>
