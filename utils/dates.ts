@@ -116,26 +116,34 @@ export function getEndOfWeekSunday(date: Date = new Date()): Date {
 }
 
 /**
- * Get next Monday from a given date (or today if Monday, return next Monday)
+ * Get next Monday from a given date (always returns next Monday, never today)
  */
 export function getNextMonday(fromDate: Date = new Date()): Date {
-  const nextMonday = getStartOfWeekMonday(fromDate);
-  // If today is already Monday, check if we want this Monday or next Monday
-  // For league start, if it's Monday and before noon, use today; otherwise next Monday
   const today = new Date(fromDate);
-  const isMonday = today.getDay() === 1;
+  today.setHours(0, 0, 0, 0);
   
-  if (isMonday) {
-    // If it's Monday, use next Monday (gives a full week to prepare)
-    nextMonday.setDate(nextMonday.getDate() + 7);
+  const day = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  
+  // Calculate days until next Monday
+  // If today is Monday (1), return NEXT Monday (+7 days, not today)
+  // If today is Tuesday (2), return this coming Monday (+6 days)
+  // If today is Sunday (0), return tomorrow Monday (+1 day)
+  let daysUntilNextMonday;
+  if (day === 1) {
+    // Today is Monday, so next Monday is 7 days away
+    daysUntilNextMonday = 7;
+  } else if (day === 0) {
+    // Today is Sunday, so next Monday is tomorrow
+    daysUntilNextMonday = 1;
   } else {
-    // If it's not Monday, get the next Monday
-    const day = today.getDay();
-    const daysToAdd = day === 0 ? 1 : 8 - day; // Sunday: +1, Tue-Sat: 8-day
-    nextMonday.setDate(today.getDate() + daysToAdd);
+    // Today is Tue-Sat, calculate days to next Monday
+    daysUntilNextMonday = 8 - day;
   }
   
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysUntilNextMonday);
   nextMonday.setHours(0, 0, 0, 0);
+  
   return nextMonday;
 }
 
@@ -153,28 +161,37 @@ export function getEndOfWeek(date: Date = new Date()): Date {
 /**
  * Get week number from start date (Monday-Sunday weeks)
  * Returns the current week number based on calendar weeks since start_date
+ * NOTE: startDate should always be a Monday (league start date)
  */
 export function getWeekNumber(startDate: Date | string, currentDate: Date = new Date()): number {
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+  const start = typeof startDate === 'string' ? new Date(startDate) : new Date(startDate);
   const current = new Date(currentDate);
   
   // Normalize to start of day
   start.setHours(0, 0, 0, 0);
   current.setHours(0, 0, 0, 0);
   
-  // Get the Monday of the start week
-  const startMonday = getStartOfWeekMonday(start);
+  // startDate should already be a Monday, so use it directly
+  // No need to call getStartOfWeekMonday() on it
   
-  // Get the Monday of the current week
-  const currentMonday = getStartOfWeekMonday(current);
+  // Calculate which week we're currently in:
+  // Week 1: startDate (Monday) through startDate + 6 (Sunday)
+  // Week 2: startDate + 7 (Monday) through startDate + 13 (Sunday)
+  // etc.
   
-  // Calculate difference in weeks
-  const diffMs = currentMonday.getTime() - startMonday.getTime();
+  const diffMs = current.getTime() - start.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  // If current date is before start date, we're in week 0 (not started yet)
+  if (diffDays < 0) {
+    return 0;
+  }
+  
+  // Calculate week number: days since start / 7, then add 1
+  // Days 0-6 = Week 1, Days 7-13 = Week 2, etc.
   const weekNumber = Math.floor(diffDays / 7) + 1;
   
-  // Week number should be at least 1
-  return Math.max(1, weekNumber);
+  return weekNumber;
 }
 
 /**
