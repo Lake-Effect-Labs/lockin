@@ -339,8 +339,8 @@ export async function syncOnAppOpen(userId: string): Promise<void> {
   try {
     console.log('🔄 [App Open] Syncing user data...');
 
-    const { fakeMode } = await import('./health');
-    const useFakeData = fakeMode || !(await import('./health')).then(m => m.isHealthAvailable());
+    const healthModule = await import('./health');
+    const useFakeData = healthModule.fakeMode || !healthModule.isHealthAvailable();
 
     // Get current week health data
     let weekData: DailyHealthData[];
