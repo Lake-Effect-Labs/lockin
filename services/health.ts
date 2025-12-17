@@ -67,23 +67,31 @@ function getAppleHealthKit(): any {
   if (!AppleHealthKitModule) {
     try {
       // Attempting to load react-native-health module
-      AppleHealthKitModule = require('react-native-health').default;
-      // react-native-health module loaded successfully
-      // Module exports available
+      const healthModule = require('react-native-health');
+      
+      // Try different export patterns - the module might export differently
+      AppleHealthKitModule = healthModule.default || healthModule.AppleHealthKit || healthModule;
+      
+      // Log what we got for debugging
+      console.log('✅ react-native-health module loaded');
+      console.log('Module type:', typeof AppleHealthKitModule);
+      console.log('Module keys:', AppleHealthKitModule ? Object.keys(AppleHealthKitModule).slice(0, 10) : 'null');
       
       // Check if Constants are available
       if (AppleHealthKitModule?.Constants) {
-        // HealthKit Constants available
-        // Available permissions loaded
+        console.log('✅ HealthKit Constants available');
       } else {
-        // HealthKit Constants not available
+        console.log('⚠️ HealthKit Constants not available, checking alternate paths');
+        // Try to find Constants in the module
+        if (healthModule.Constants) {
+          console.log('Found Constants on healthModule directly');
+        }
       }
       
       return AppleHealthKitModule;
     } catch (error: any) {
       console.error('❌ Failed to load react-native-health:', error);
       console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
       console.error('❌ This usually means:');
       console.error('   1. You are using Expo Go (HealthKit requires a development build)');
       console.error('   2. The native module is not properly linked');
