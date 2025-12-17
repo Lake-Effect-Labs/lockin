@@ -69,23 +69,32 @@ function getAppleHealthKit(): any {
       // Attempting to load react-native-health module
       const healthModule = require('react-native-health');
       
+      console.log('📦 react-native-health require() succeeded');
+      console.log('healthModule:', typeof healthModule);
+      console.log('healthModule.default:', typeof healthModule?.default);
+      console.log('healthModule keys:', healthModule ? Object.keys(healthModule).join(', ') : 'none');
+      
       // Try different export patterns - the module might export differently
-      AppleHealthKitModule = healthModule.default || healthModule.AppleHealthKit || healthModule;
+      const candidate = healthModule.default || healthModule.AppleHealthKit || healthModule;
       
-      // Log what we got for debugging
-      console.log('✅ react-native-health module loaded');
-      console.log('Module type:', typeof AppleHealthKitModule);
-      console.log('Module keys:', AppleHealthKitModule ? Object.keys(AppleHealthKitModule).slice(0, 10) : 'null');
+      console.log('candidate type:', typeof candidate);
+      console.log('candidate keys:', candidate ? Object.keys(candidate).slice(0, 15).join(', ') : 'none');
       
-      // Check if Constants are available
-      if (AppleHealthKitModule?.Constants) {
-        console.log('✅ HealthKit Constants available');
+      // Verify this is actually a valid HealthKit module by checking for expected methods
+      if (candidate && typeof candidate.initHealthKit === 'function') {
+        console.log('✅ Valid HealthKit module found (has initHealthKit)');
+        AppleHealthKitModule = candidate;
+      } else if (candidate && typeof candidate.isAvailable === 'function') {
+        console.log('✅ Valid HealthKit module found (has isAvailable)');
+        AppleHealthKitModule = candidate;
+      } else if (candidate && candidate.Constants) {
+        console.log('✅ Valid HealthKit module found (has Constants)');
+        AppleHealthKitModule = candidate;
       } else {
-        console.log('⚠️ HealthKit Constants not available, checking alternate paths');
-        // Try to find Constants in the module
-        if (healthModule.Constants) {
-          console.log('Found Constants on healthModule directly');
-        }
+        console.error('❌ Module loaded but does not have expected HealthKit methods');
+        console.error('Available methods:', candidate ? Object.keys(candidate) : 'none');
+        // Still try to use it
+        AppleHealthKitModule = candidate;
       }
       
       return AppleHealthKitModule;
