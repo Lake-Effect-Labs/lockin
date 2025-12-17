@@ -34,6 +34,9 @@ import {
   runFullRegressionSuite,
   RegressionTestResults,
 } from '@/services/regressionTests';
+import { runAdMobSafetyCheck as checkAdMobSafety } from '@/services/ads';
+import { runCrashDiagnostics } from '@/services/crashDiagnostics';
+import { getStoredCrashes } from '@/services/crashReporting';
 import {
   runWeeklySimulation,
   SimulationStep,
@@ -216,6 +219,55 @@ export default function DebugScreen() {
       );
     } catch (error: any) {
       Alert.alert('❌ Sanity Check Error', `Failed to run HealthKit check: ${error.message}`);
+    }
+  };
+
+  const runAdMobSafetyCheck = () => {
+    try {
+      const check = checkAdMobSafety();
+
+      Alert.alert(
+        `📱 AdMob Safety Check: ${check.safe ? '✅ SAFE' : '⚠️ NOT SAFE'}`,
+        `${check.message}\n\n` +
+        `Details:\n` +
+        `Module Available: ${check.details.moduleAvailable ? '✅ YES' : '❌ NO'}\n` +
+        `Configured: ${check.details.configured ? '✅ YES' : '❌ NO'}\n` +
+        `Not Expo Go: ${check.details.notExpoGo ? '✅ YES' : '❌ NO'}\n` +
+        `Can Initialize: ${check.details.canInitialize ? '✅ YES' : '❌ NO'}\n\n` +
+        `${check.safe ? '✅ Ads will work correctly' : '⚠️ Ads will be disabled to prevent crashes'}`
+      );
+    } catch (error: any) {
+      Alert.alert('❌ Safety Check Error', `Failed to run AdMob check: ${error.message}`);
+    }
+  };
+
+  const runCrashDiagnosticsCheck = async () => {
+    try {
+      const diagnostics = await runCrashDiagnostics();
+      const crashes = await getStoredCrashes();
+
+      const safeCount = diagnostics.filter(d => d.status === 'safe').length;
+      const warningCount = diagnostics.filter(d => d.status === 'warning').length;
+      const dangerCount = diagnostics.filter(d => d.status === 'danger').length;
+
+      const detailsText = diagnostics.map(d => {
+        const icon = d.status === 'safe' ? '✅' : d.status === 'warning' ? '⚠️' : '❌';
+        return `${icon} ${d.category}: ${d.message}`;
+      }).join('\n');
+
+      const crashText = crashes.length > 0
+        ? `\n\n📊 Crash History:\n${crashes.length} total crash(es) stored\nLatest: ${crashes[crashes.length - 1]?.error?.substring(0, 100)}...`
+        : '\n\n📊 Crash History: No crashes stored';
+
+      Alert.alert(
+        `🔍 Crash Diagnostics`,
+        `Status: ${dangerCount > 0 ? '❌ DANGER' : warningCount > 0 ? '⚠️ WARNINGS' : '✅ SAFE'}\n\n` +
+        `Safe: ${safeCount} | Warnings: ${warningCount} | Dangers: ${dangerCount}\n\n` +
+        `Details:\n${detailsText}` +
+        crashText
+      );
+    } catch (error: any) {
+      Alert.alert('❌ Diagnostics Error', `Failed to run diagnostics: ${error.message}`);
     }
   };
   
@@ -475,6 +527,34 @@ export default function DebugScreen() {
               ))}
             </View>
           )}
+        </View>
+
+        {/* AdMob Safety Check */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📱 AdMob Safety</Text>
+          
+          <TouchableOpacity
+            onPress={runAdMobSafetyCheck}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="shield-checkmark" size={20} color={colors.status.success} />
+            <Text style={styles.secondaryText}>AdMob Safety Check</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Crash Diagnostics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🚨 Crash Diagnostics</Text>
+          
+          <TouchableOpacity
+            onPress={runCrashDiagnosticsCheck}
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bug" size={20} color={colors.status.error} />
+            <Text style={styles.secondaryText}>Run Crash Diagnostics</Text>
+          </TouchableOpacity>
         </View>
         
         {/* On-App-Open Sync Info */}

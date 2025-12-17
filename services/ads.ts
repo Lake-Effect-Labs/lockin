@@ -22,6 +22,57 @@ try {
   console.log('AdMob not available in this environment');
 }
 
+/**
+ * Validate that AdMob is safe to use
+ * Returns true if AdMob can be safely initialized/used
+ */
+export function validateAdMobAvailability(): {
+  available: boolean;
+  reason?: string;
+  checks: {
+    moduleLoaded: boolean;
+    hasAppId: boolean;
+    notExpoGo: boolean;
+  };
+} {
+  const checks = {
+    moduleLoaded: !!mobileAds && typeof mobileAds === 'function',
+    hasAppId: isAdMobConfigured(),
+    notExpoGo: Constants.executionEnvironment !== 'storeClient',
+  };
+
+  const available = checks.moduleLoaded && checks.hasAppId && checks.notExpoGo;
+
+  let reason: string | undefined;
+  if (!available) {
+    if (!checks.moduleLoaded) {
+      reason = 'AdMob module not loaded (likely Expo Go or missing dependency)';
+    } else if (!checks.hasAppId) {
+      reason = 'AdMob app IDs not configured in environment variables';
+    } else if (!checks.notExpoGo) {
+      reason = 'Running in Expo Go (AdMob requires development build)';
+    }
+  }
+
+  return { available, reason, checks };
+}
+
+/**
+ * Safe wrapper for mobileAds() calls
+ * Returns null if AdMob is not available
+ */
+function safeMobileAds(): any {
+  if (!mobileAds || typeof mobileAds !== 'function') {
+    return null;
+  }
+  try {
+    return mobileAds();
+  } catch (error) {
+    console.error('Error calling mobileAds():', error);
+    return null;
+  }
+}
+
 export interface AdConfig {
   enabled: boolean;
   frequencyCap: number; // Max ads per day
@@ -49,14 +100,28 @@ const DEFAULT_CONFIG: AdConfig = {
  */
 export async function initializeAdMob(): Promise<void> {
   try {
-    // Check if we have valid AdMob app IDs before initializing
-    if (!isAdMobConfigured()) {
-      console.log('⚠️ AdMob not configured, skipping initialization');
+    // Validate AdMob availability first
+    const validation = validateAdMobAvailability();
+    if (!validation.available) {
+      console.log(`⚠️ AdMob initialization skipped: ${validation.reason}`);
+      return;
+    }
+
+    // Get safe mobileAds instance
+    const adsInstance = safeMobileAds();
+    if (!adsInstance) {
+      console.log('⚠️ AdMob instance not available, skipping initialization');
+      return;
+    }
+
+    // Validate MaxAdContentRating exists
+    if (!MaxAdContentRating || !MaxAdContentRating.PG) {
+      console.log('⚠️ MaxAdContentRating not available, skipping initialization');
       return;
     }
 
     // Set up AdMob with appropriate content rating
-    await mobileAds().setRequestConfiguration({
+    await adsInstance.setRequestConfiguration({
       // Maximum ad content rating for family-friendly content
       maxAdContentRating: MaxAdContentRating.PG,
       // Enable test devices in development
@@ -64,12 +129,11 @@ export async function initializeAdMob(): Promise<void> {
     });
 
     // Initialize AdMob
-    await mobileAds().initialize();
+    await adsInstance.initialize();
 
     console.log('✅ AdMob initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize AdMob:', error);
-    console.error('Error details:', error);
     // Don't crash the app - just log the error
   }
 }
@@ -221,5 +285,42 @@ export async function getTodayAdStats(): Promise<{
   } catch (error) {
     return { impressions: 0, count: 0 };
   }
+}
+
+/**
+ * Comprehensive AdMob safety check
+ * Call this to verify AdMob is safe to use before rendering ads
+ */
+export function runAdMobSafetyCheck(): {
+  safe: boolean;
+  message: string;
+  details: {
+    moduleAvailable: boolean;
+    configured: boolean;
+    notExpoGo: boolean;
+    canInitialize: boolean;
+  };
+} {
+  const validation = validateAdMobAvailability();
+  const moduleAvailable = !!mobileAds && typeof mobileAds === 'function';
+  const configured = isAdMobConfigured();
+  const notExpoGo = Constants.executionEnvironment !== 'storeClient';
+  const canInitialize = moduleAvailable && configured && notExpoGo;
+
+  const safe = canInitialize;
+  const message = safe
+    ? '✅ AdMob is safe to use'
+    : `⚠️ AdMob not safe: ${validation.reason || 'Unknown issue'}`;
+
+  return {
+    safe,
+    message,
+    details: {
+      moduleAvailable,
+      configured,
+      notExpoGo,
+      canInitialize,
+    },
+  };
 }
 

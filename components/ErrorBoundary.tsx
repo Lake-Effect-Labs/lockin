@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/utils/colors';
+import { reportCrash } from '@/services/crashReporting';
 
 // ============================================
 // ERROR BOUNDARY COMPONENT
@@ -40,8 +41,13 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
     
-    // In production, you could send this to an error tracking service
-    // Example: Sentry.captureException(error, { contexts: { react: errorInfo } });
+    // Report crash without showing to user
+    reportCrash(error, {
+      componentStack: errorInfo.componentStack,
+      errorBoundary: true,
+    }).catch(() => {
+      // Ignore if crash reporting fails
+    });
   }
 
   handleReset = () => {

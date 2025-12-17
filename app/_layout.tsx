@@ -13,6 +13,7 @@ import { registerForPushNotifications } from '@/services/notifications';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { syncOnAppOpen } from '@/services/realtimeSync';
 import { initializeAdMob } from '@/services/ads';
+import { setupGlobalErrorHandlers } from '@/services/crashReporting';
 
 // ============================================
 // ROOT LAYOUT
@@ -34,6 +35,9 @@ export default function RootLayout() {
   const { initializeTheme, effectiveTheme } = useSettingsStore();
   
   useEffect(() => {
+    // Set up global error handlers first (before anything else)
+    setupGlobalErrorHandlers();
+
     // Initialize app on mount
     const init = async () => {
       try {

@@ -37,12 +37,45 @@ if (Constants.executionEnvironment !== 'storeClient') {
     console.log('AdMob not available in this environment');
   }
 }
+
+/**
+ * Validate AdMob components are safe to use
+ * Returns true if all required components are available and valid
+ */
+function validateAdMobComponents(): {
+  valid: boolean;
+  reason?: string;
+  checks: {
+    BannerAd: boolean;
+    BannerAdSize: boolean;
+    TestIds: boolean;
+  };
+} {
+  const checks = {
+    BannerAd: !!BannerAd && typeof BannerAd === 'function',
+    BannerAdSize: !!BannerAdSize && typeof BannerAdSize === 'object',
+    TestIds: !!TestIds && typeof TestIds === 'object' && !!(TestIds?.BANNER),
+  };
+
+  const valid = checks.BannerAd && checks.BannerAdSize && checks.TestIds;
+
+  let reason: string | undefined;
+  if (!valid) {
+    const missing = Object.entries(checks)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key)
+      .join(', ');
+    reason = `Missing AdMob components: ${missing}`;
+  }
+
+  return { valid, reason, checks };
+}
 interface AdBannerProps {
   unitId?: string;
   style?: any;
   onAdLoaded?: () => void;
   onAdFailedToLoad?: (error: any) => void;
-  size?: BannerAdSize;
+  size?: any; // BannerAdSize type, but can be null if AdMob not available
 }
 
 export function AdBanner({
@@ -50,16 +83,20 @@ export function AdBanner({
   style,
   onAdLoaded,
   onAdFailedToLoad,
-  size = BannerAdSize?.BANNER || 'banner'
+  size
 }: AdBannerProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [adDismissedToday, setAdDismissedToday] = useState(false);
 
-  // Don't render if AdMob is not available
-  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
-  if (!isAdMobAvailable) {
+  // Validate AdMob components before using them
+  const validation = validateAdMobComponents();
+  if (!validation.valid) {
+    // Silently return null - don't crash the app
     return null;
   }
+
+  // Set default size only if AdMob is available and validated
+  const adSize = size || (BannerAdSize?.BANNER) || 'banner';
 
   useEffect(() => {
     checkAdDismissedToday();
@@ -121,22 +158,12 @@ export function AdBanner({
           <Text style={styles.adLabelText}>Ad</Text>
         </View>
         <View style={styles.adWrapper}>
-          {isAdMobAvailable ? (
-            <BannerAd
-              unitId={getAdUnitId()}
-              size={size}
-              onAdLoaded={onAdLoaded}
-              onAdFailedToLoad={onAdFailedToLoad}
-            />
-          ) : (
-            // Show placeholder when AdMob is not available (Expo Go)
-            <View style={styles.adPlaceholder}>
-              <Ionicons name="megaphone-outline" size={24} color={colors.text.tertiary} />
-              <Text style={styles.adPlaceholderText}>
-                Advertisement
-              </Text>
-            </View>
-          )}
+          <BannerAd
+            unitId={getAdUnitId()}
+            size={adSize}
+            onAdLoaded={onAdLoaded}
+            onAdFailedToLoad={onAdFailedToLoad}
+          />
         </View>
       </View>
       <TouchableOpacity
@@ -160,10 +187,11 @@ interface SmartAdBannerProps {
 export function SmartAdBanner({ placement, style, forceShow = false }: SmartAdBannerProps) {
   const [shouldShow, setShouldShow] = useState(false);
 
-  // Don't show ads if AdMob is not available (Expo Go, etc.)
-  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
-  if (!isAdMobAvailable && !forceShow) {
-    return null; // Don't show ads when AdMob is not available
+  // Validate AdMob components before using them
+  const validation = validateAdMobComponents();
+  if (!validation.valid && !forceShow) {
+    // Silently return null - don't crash the app
+    return null;
   }
 
   useEffect(() => {
