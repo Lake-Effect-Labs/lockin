@@ -24,18 +24,18 @@ let BannerAdSize: any = null;
 let TestIds: any = null;
 let mobileAds: any = null;
 
-try {
-  // Only import AdMob if we're not in Expo Go
-  if (Constants.executionEnvironment !== 'storeClient') {
+// Only import AdMob if we're not in Expo Go
+if (Constants.executionEnvironment !== 'storeClient') {
+  try {
     const admob = require('react-native-google-mobile-ads');
     BannerAd = admob.BannerAd;
     BannerAdSize = admob.BannerAdSize;
     TestIds = admob.TestIds;
     mobileAds = admob.mobileAds;
+  } catch (error) {
+    // AdMob not available - this is expected in some environments
+    console.log('AdMob not available in this environment');
   }
-} catch (error) {
-  // AdMob not available (likely Expo Go)
-  console.log('AdMob not available in this environment');
 }
 interface AdBannerProps {
   unitId?: string;
@@ -50,10 +50,16 @@ export function AdBanner({
   style,
   onAdLoaded,
   onAdFailedToLoad,
-  size = BannerAdSize.BANNER
+  size = BannerAdSize?.BANNER || 'banner'
 }: AdBannerProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [adDismissedToday, setAdDismissedToday] = useState(false);
+
+  // Don't render if AdMob is not available
+  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
+  if (!isAdMobAvailable) {
+    return null;
+  }
 
   useEffect(() => {
     checkAdDismissedToday();
@@ -82,20 +88,26 @@ export function AdBanner({
     }
   };
 
-  // Check if AdMob is available
-  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
-
   // Get the ad unit ID - use test ID if not provided or in development
   const getAdUnitId = () => {
     if (unitId) return unitId;
-    if (__DEV__) return TestIds?.BANNER || 'test-banner-id';
+
+    // Always use test ID when AdMob is not available (Expo Go, etc.)
+    if (!isAdMobAvailable || Constants.executionEnvironment === 'storeClient') {
+      return 'ca-app-pub-3940256099942544/6300978111'; // AdMob test banner ID
+    }
+
+    // AdMob is available, use proper IDs
+    if (__DEV__) {
+      return TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111';
+    }
 
     // Production: use environment variables
     const envVar = Platform.OS === 'ios'
       ? Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_IOS
       : Constants.expoConfig?.extra?.EXPO_PUBLIC_ADMOB_BANNER_ANDROID;
 
-    return envVar || TestIds?.BANNER || 'test-banner-id';
+    return envVar || TestIds?.BANNER || 'ca-app-pub-3940256099942544/6300978111';
   };
 
   if (!isVisible || adDismissedToday) {
@@ -147,7 +159,13 @@ interface SmartAdBannerProps {
 
 export function SmartAdBanner({ placement, style, forceShow = false }: SmartAdBannerProps) {
   const [shouldShow, setShouldShow] = useState(false);
-  
+
+  // Don't show ads if AdMob is not available (Expo Go, etc.)
+  const isAdMobAvailable = BannerAd && BannerAdSize && TestIds;
+  if (!isAdMobAvailable && !forceShow) {
+    return null; // Don't show ads when AdMob is not available
+  }
+
   useEffect(() => {
     if (forceShow) {
       setShouldShow(true);
