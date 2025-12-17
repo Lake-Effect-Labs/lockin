@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lock-In",
     "slug": "lock-in",
-    "version": "1.0.25",
+    "version": "1.0.26",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "lockin",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.lockin.app",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In needs access to your health data to track your fitness metrics and compete in leagues.",
         "NSHealthUpdateUsageDescription": "Lock-In needs permission to update your health data.",

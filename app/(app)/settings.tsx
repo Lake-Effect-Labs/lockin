@@ -159,29 +159,7 @@ export default function SettingsScreen() {
                           return;
                         }
 
-                        // For production builds (TestFlight), permissions often need to be enabled manually
-                        if (!isDevelopment) {
-                          Alert.alert(
-                            'TestFlight Health Access',
-                            'In TestFlight builds, you need to manually enable Health permissions:\n\n1. Open Settings app\n2. Go to Privacy & Security\n3. Tap Health\n4. Find "Lock-In" and enable permissions\n\nThen restart the app.',
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              {
-                                text: 'Open Settings',
-                                onPress: () => {
-                                  Linking.openURL('App-prefs:Privacy&path=HEALTH').catch(() => {
-                                    Linking.openURL('App-prefs:Privacy').catch(() => {
-                                      Alert.alert('Manual Setup Required', 'Please go to Settings > Privacy & Security > Health and enable permissions for Lock-In.');
-                                    });
-                                  });
-                                }
-                              }
-                            ]
-                          );
-                          return;
-                        }
-
-                        // Development build - try in-app permission request
+                        // Request HealthKit permissions
                         const granted = await requestPermissions();
 
                         // Wait a moment for iOS to process the request
@@ -192,15 +170,28 @@ export default function SettingsScreen() {
 
                         if (!granted) {
                           Alert.alert(
-                            'Permission Required',
-                            'Health permissions were not granted. You can enable them later in Settings > Privacy & Security > Health.',
+                            '🏥 Enable Health Access',
+                            'To enable Health data access:\n\n' +
+                            '📱 OPTION 1 (Recommended):\n' +
+                            '1. Open the Health app\n' +
+                            '2. Tap your profile icon (top right)\n' +
+                            '3. Scroll to "Apps" or "Apps & Devices"\n' +
+                            '4. Find "Lock-In" and enable permissions\n\n' +
+                            '⚙️ OPTION 2:\n' +
+                            '1. Settings → Privacy & Security → Health\n' +
+                            '2. Find "Lock-In" and enable permissions\n\n' +
+                            'Then restart Lock-In.',
                             [
                               { text: 'OK' },
                               {
-                                text: 'Open Settings',
+                                text: 'Open Health App',
                                 onPress: () => {
-                                  Linking.openURL('App-prefs:Privacy&path=HEALTH').catch(() => {
-                                    Linking.openSettings();
+                                  // Try to open Health app directly
+                                  Linking.openURL('x-apple-health://').catch(() => {
+                                    // Fallback to Settings
+                                    Linking.openURL('App-prefs:Privacy&path=HEALTH').catch(() => {
+                                      Linking.openSettings();
+                                    });
                                   });
                                 }
                               }
@@ -208,8 +199,11 @@ export default function SettingsScreen() {
                           );
                         } else {
                           Alert.alert(
-                            'Success!',
-                            'Health permissions granted! You can now sync your fitness data.'
+                            '✅ Success!',
+                            'Health permissions granted! Lock-In will now sync your fitness data.\n\n' +
+                            'You can manage permissions anytime in:\n' +
+                            '• Health app → Profile → Apps\n' +
+                            '• Settings → Privacy → Health'
                           );
                         }
                       } catch (error: any) {
