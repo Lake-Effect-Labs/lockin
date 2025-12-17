@@ -32,11 +32,31 @@ let HealthKitModule: any = null;
 function getHealthKit(): any {
   if (!HealthKitModule) {
     try {
+      console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       HealthKitModule = require('@kingstinct/react-native-healthkit');
+      
       console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
+      console.log('📊 Module details:');
+      console.log('   - Type:', typeof HealthKitModule);
+      console.log('   - Null?:', HealthKitModule === null);
+      
+      if (HealthKitModule) {
+        const keys = Object.keys(HealthKitModule);
+        console.log('   - Export count:', keys.length);
+        console.log('   - Sample keys:', keys.slice(0, 8).join(', '));
+        console.log('   - Has requestAuthorization:', !!HealthKitModule.requestAuthorization);
+        console.log('   - Has isHealthDataAvailable:', !!HealthKitModule.isHealthDataAvailable);
+        console.log('   - Has HKQuantityTypeIdentifier:', !!HealthKitModule.HKQuantityTypeIdentifier);
+      }
+      
       return HealthKitModule;
     } catch (error: any) {
-      console.error('❌ Failed to load HealthKit module:', error.message);
+      console.error('❌ CRITICAL: Failed to load HealthKit module');
+      console.error('   - Error:', error.message);
+      console.error('   - Code:', error.code);
+      console.error('');
+      console.error('💡 This means native module NOT in build!');
+      console.error('🔧 Fix: eas build --platform ios --profile testflight --clear-cache');
       return null;
     }
   }
@@ -48,36 +68,72 @@ function getHealthKit(): any {
  * Returns true if health data is available
  */
 export async function initializeHealth(): Promise<boolean> {
+  console.log('');
+  console.log('='.repeat(60));
+  console.log('🏥 HEALTHKIT INITIALIZATION - DETAILED DIAGNOSTIC LOG');
+  console.log('='.repeat(60));
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('');
+  
+  // Step 1: Platform check
+  console.log('📱 STEP 1: Platform Check');
+  console.log('   - Platform.OS:', Platform.OS);
   if (Platform.OS !== 'ios') {
-    console.log('⚠️ Health data only available on iOS');
+    console.log('   ❌ FAILED: Not iOS');
+    console.log('='.repeat(60));
     return false;
   }
+  console.log('   ✅ PASSED: iOS detected');
+  console.log('');
 
+  // Step 2: Expo Go check
+  console.log('📱 STEP 2: Execution Environment Check');
+  console.log('   - executionEnvironment:', Constants?.executionEnvironment);
+  console.log('   - isExpoGo:', isExpoGo);
   if (isExpoGo) {
-    console.log('⚠️ HealthKit not available in Expo Go');
-    console.log('🔧 Use: eas build --platform ios --profile development');
+    console.log('   ❌ FAILED: Running in Expo Go (native modules unavailable)');
+    console.log('   🔧 Solution: Use EAS Build');
+    console.log('='.repeat(60));
     return false;
   }
+  console.log('   ✅ PASSED: Standalone build');
+  console.log('');
 
   try {
+    // Step 3: Load module
+    console.log('📦 STEP 3: Load HealthKit Module');
     const HealthKit = getHealthKit();
     
     if (!HealthKit) {
-      console.log('⚠️ HealthKit module not available');
+      console.log('   ❌ FAILED: Module returned null');
+      console.log('   💡 Native module not included in build');
+      console.log('='.repeat(60));
       return false;
     }
+    console.log('   ✅ PASSED: Module loaded');
+    console.log('');
 
-    // Check if HealthKit is available on device
+    // Step 4: Check device availability
+    console.log('📱 STEP 4: Check HealthKit Device Availability');
+    console.log('   - Calling: HealthKit.isHealthDataAvailable()');
+    const startAvailCheck = Date.now();
     const isAvailable = await HealthKit.isHealthDataAvailable();
+    const availCheckDuration = Date.now() - startAvailCheck;
+    console.log('   - Duration:', availCheckDuration, 'ms');
+    console.log('   - Result:', isAvailable);
+    console.log('   - Result type:', typeof isAvailable);
     
     if (!isAvailable) {
-      console.log('❌ HealthKit not available on this device');
+      console.log('   ❌ FAILED: HealthKit not available on device');
+      console.log('   💡 This should never happen on iPhone 6s+');
+      console.log('='.repeat(60));
       return false;
     }
+    console.log('   ✅ PASSED: HealthKit available on device');
+    console.log('');
 
-    console.log('✅ HealthKit is available');
-
-    // Request permissions for the data types we need
+    // Step 5: Build permissions object
+    console.log('🔐 STEP 5: Build Permission Request');
     const permissions = {
       read: [
         HealthKit.HKQuantityTypeIdentifier.stepCount,
@@ -87,18 +143,65 @@ export async function initializeHealth(): Promise<boolean> {
         HealthKit.HKWorkoutTypeIdentifier.workoutType,
       ],
     };
+    console.log('   - Permissions:', JSON.stringify(permissions, null, 2));
+    console.log('   ✅ Permission object created');
+    console.log('');
 
-    console.log('🔵 Requesting HealthKit permissions...');
+    // Step 6: Request authorization (THIS IS THE CRITICAL STEP)
+    console.log('🚀 STEP 6: Request Authorization');
+    console.log('   - Calling: HealthKit.requestAuthorization()');
+    console.log('   - Start time:', new Date().toISOString());
+    console.log('');
+    console.log('   ⏳ WAITING FOR USER INTERACTION...');
+    console.log('   💡 iOS permission dialog should appear NOW');
+    console.log('');
     
-    await HealthKit.requestAuthorization(permissions);
+    const startAuthTime = Date.now();
+    const authResult = await HealthKit.requestAuthorization(permissions);
+    const authDuration = Date.now() - startAuthTime;
     
-    console.log('✅ HealthKit permissions requested successfully');
-    console.log('✅ Lock-In should now appear in Settings → Privacy → Health');
+    console.log('   - End time:', new Date().toISOString());
+    console.log('   - Duration:', authDuration, 'ms');
+    console.log('   - Result:', authResult);
+    console.log('   - Result type:', typeof authResult);
+    console.log('');
+    
+    if (authDuration < 500) {
+      console.log('   ⚠️ WARNING: Call completed in < 500ms');
+      console.log('   💡 This suggests no dialog was shown (should take 2+ seconds)');
+    } else {
+      console.log('   ✅ Duration suggests dialog was shown');
+    }
+    console.log('');
+    
+    console.log('🎉 INITIALIZATION COMPLETE');
+    console.log('');
+    console.log('📝 NEXT STEPS FOR USER:');
+    console.log('   1. Open iOS Settings app');
+    console.log('   2. Go to: Privacy & Security → Health');
+    console.log('   3. Look for "Lock-In" in the list');
+    console.log('   4. OR: Open Health app → Profile → Apps');
+    console.log('');
+    console.log('🔍 CRITICAL QUESTION:');
+    console.log('   Did you see the iOS Health permission dialog?');
+    console.log('   - YES = SUCCESS (Lock-In should be in Health settings)');
+    console.log('   - NO = BUG (permissions not being requested)');
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('');
     
     return true;
   } catch (error: any) {
-    console.error('❌ Failed to initialize HealthKit:', error);
-    console.error('Error message:', error.message);
+    console.log('');
+    console.log('❌ EXCEPTION THROWN DURING INITIALIZATION');
+    console.log('   - Error name:', error.name);
+    console.log('   - Error message:', error.message);
+    console.log('   - Error code:', error.code);
+    console.log('   - Error stack:');
+    console.log(error.stack);
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('');
     return false;
   }
 }

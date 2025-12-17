@@ -437,6 +437,13 @@ export default function DebugScreen() {
           </Text>
         </View>
         
+        <View style={[styles.warningBanner, { backgroundColor: colors.primary[900], borderColor: colors.primary[700] }]}>
+          <Ionicons name="information-circle" size={20} color={colors.primary[500]} />
+          <Text style={[styles.warningText, { color: colors.text.secondary }]}>
+            📋 For best diagnostics: After testing, shake device → "Show Dev Menu" → "Debug JS Remotely" to see console logs. Or use Safari → Develop → Your iPhone → JSContext
+          </Text>
+        </View>
+        
         {/* Health Integration Tests */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🏥 Health Integration</Text>
@@ -486,17 +493,72 @@ export default function DebugScreen() {
 
           <TouchableOpacity
             onPress={async () => {
+              const logs: string[] = [];
+              let dialogShown = false;
+              
               try {
-                Alert.alert('🔄 Force Initializing...', 'Attempting to initialize HealthKit...');
+                logs.push('🔄 Starting HealthKit initialization...');
+                logs.push('');
+                
+                // Check if module exists
+                try {
+                  const HealthKit = require('@kingstinct/react-native-healthkit');
+                  logs.push('✅ Module loaded successfully');
+                  logs.push(`Module keys: ${Object.keys(HealthKit).slice(0, 5).join(', ')}...`);
+                  logs.push('');
+                } catch (e: any) {
+                  logs.push(`❌ FATAL: Module not found - ${e.message}`);
+                  Alert.alert('❌ Module Missing', logs.join('\n'));
+                  return;
+                }
+                
+                logs.push('📱 Calling initializeHealth()...');
+                const initStartTime = Date.now();
+                
                 const success = await initializeHealth();
+                
+                const initDuration = Date.now() - initStartTime;
+                logs.push(`⏱️ Init took ${initDuration}ms`);
+                logs.push('');
+                
+                if (success) {
+                  logs.push('✅ SUCCESS!');
+                  logs.push('');
+                  logs.push('🎉 HealthKit initialized!');
+                  logs.push('');
+                  logs.push('📝 Next Steps:');
+                  logs.push('1. Check Settings → Privacy → Health');
+                  logs.push('2. Look for "Lock-In" app');
+                  logs.push('3. If not there, check Health app → Profile → Apps');
+                  logs.push('');
+                  logs.push('💡 If dialog appeared, permissions were requested');
+                  dialogShown = true;
+                } else {
+                  logs.push('⚠️ Init returned FALSE');
+                  logs.push('');
+                  logs.push('This could mean:');
+                  logs.push('• Permission dialog was shown (GOOD)');
+                  logs.push('• User denied permissions');
+                  logs.push('• Native module returned false');
+                  logs.push('');
+                  logs.push('🔍 Check if you saw a permission dialog');
+                  logs.push('');
+                  logs.push('If NO dialog appeared:');
+                  logs.push('→ This is the BUG we need to fix');
+                }
+                
                 Alert.alert(
-                  success ? '✅ Success!' : '⚠️ Partial Success',
-                  success
-                    ? 'HealthKit initialized! Check Settings → Privacy → Health for Lock-In app.'
-                    : 'HealthKit initialization returned false. Check diagnostics for details.'
+                  success ? '✅ Initialization Complete' : '⚠️ Check Results',
+                  logs.join('\n'),
+                  [{ text: 'OK' }]
                 );
               } catch (error: any) {
-                Alert.alert('❌ Error', `HealthKit initialization failed: ${error.message}`);
+                logs.push(`❌ EXCEPTION: ${error.message}`);
+                logs.push('');
+                logs.push(`Error name: ${error.name}`);
+                logs.push(`Error stack: ${error.stack?.substring(0, 200)}...`);
+                
+                Alert.alert('❌ Error', logs.join('\n'));
               }
             }}
             style={styles.secondaryButton}
@@ -512,35 +574,41 @@ export default function DebugScreen() {
                 // Detailed module loading test
                 let logs: string[] = [];
                 
-                logs.push('=== Module Loading Test ===');
+                logs.push('=== HealthKit Module Test ===');
+                logs.push('Testing: @kingstinct/react-native-healthkit');
+                logs.push('');
                 
                 try {
-                  const healthModule = require('react-native-health');
+                  const HealthKit = require('@kingstinct/react-native-healthkit');
                   logs.push(`✅ require() succeeded`);
-                  logs.push(`typeof healthModule: ${typeof healthModule}`);
-                  logs.push(`healthModule keys: ${healthModule ? Object.keys(healthModule).join(', ') : 'none'}`);
+                  logs.push(`typeof module: ${typeof HealthKit}`);
                   
-                  if (healthModule.default) {
-                    logs.push(`✅ healthModule.default exists`);
-                    logs.push(`typeof default: ${typeof healthModule.default}`);
-                    logs.push(`default keys: ${Object.keys(healthModule.default).slice(0, 10).join(', ')}`);
-                    
-                    if (healthModule.default.initHealthKit) {
-                      logs.push(`✅ initHealthKit function found`);
-                    } else {
-                      logs.push(`❌ initHealthKit NOT found`);
-                    }
-                    
-                    if (healthModule.default.Constants) {
-                      logs.push(`✅ Constants found`);
-                    } else {
-                      logs.push(`❌ Constants NOT found`);
-                    }
+                  const keys = HealthKit ? Object.keys(HealthKit) : [];
+                  logs.push(`Module exports (${keys.length}): ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '...' : ''}`);
+                  
+                  if (HealthKit.requestAuthorization) {
+                    logs.push(`✅ requestAuthorization: YES`);
                   } else {
-                    logs.push(`❌ healthModule.default is falsy`);
+                    logs.push(`❌ requestAuthorization: NO`);
+                  }
+                  
+                  if (HealthKit.queryQuantitySamples) {
+                    logs.push(`✅ queryQuantitySamples: YES`);
+                  } else {
+                    logs.push(`❌ queryQuantitySamples: NO`);
+                  }
+                  
+                  if (HealthKit.HealthDataType) {
+                    logs.push(`✅ HealthDataType: YES`);
+                  } else {
+                    logs.push(`❌ HealthDataType: NO`);
                   }
                 } catch (requireError: any) {
                   logs.push(`❌ require() FAILED: ${requireError.message}`);
+                  logs.push('');
+                  logs.push('💡 Native module NOT in build');
+                  logs.push('');
+                  logs.push('FIX: Rebuild with --clear-cache');
                 }
                 
                 Alert.alert('🔬 Module Loading Test', logs.join('\n'));
