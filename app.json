@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lock-In",
     "slug": "lock-in",
-    "version": "1.0.24",
+    "version": "1.0.25",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "lockin",
@@ -45,9 +45,10 @@
         }
       ],
       [
-        "react-native-health",
+        "@kingstinct/react-native-healthkit",
         {
-          "isClinicalDataEnabled": false
+          "isClinicalDataEnabled": false,
+          "healthSharePermission": "Lock-In needs access to your health data to track your fitness metrics and compete in leagues."
         }
       ],
       "expo-background-fetch",
