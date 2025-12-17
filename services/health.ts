@@ -125,22 +125,10 @@ async function initializeAppleHealth(): Promise<boolean> {
       return false;
     }
     
-    // Check if HealthKit is available on this device
-    const isAvailable = await new Promise<boolean>((resolve) => {
-      AppleHealthKit.isAvailable((error: any, available: boolean) => {
-        if (error) {
-          console.error('HealthKit availability check error:', error);
-          resolve(false);
-        } else {
-          resolve(available);
-        }
-      });
-    });
-    
-    if (!isAvailable) {
-      console.log('HealthKit is not available on this device');
-      return false;
-    }
+    // SKIP isAvailable() check - it's unreliable on some devices
+    // Go straight to initHealthKit() which will show the permission dialog
+    console.log('⏭️ Skipping isAvailable() check - going straight to initHealthKit()');
+    console.log('📱 This will trigger the HealthKit permission dialog');
     
     const permissions = {
       permissions: {
