@@ -1,8 +1,34 @@
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { updatePushToken, createNotification } from './supabase';
+
+// Lazy load native modules to prevent crashes at module load time
+let Notifications: any = null;
+let Device: any = null;
+
+function getNotifications() {
+  if (!Notifications) {
+    try {
+      Notifications = require('expo-notifications');
+    } catch (error) {
+      console.warn('Notifications not available:', error);
+      Notifications = null;
+    }
+  }
+  return Notifications;
+}
+
+function getDevice() {
+  if (!Device) {
+    try {
+      Device = require('expo-device');
+    } catch (error) {
+      console.warn('Device not available:', error);
+      Device = null;
+    }
+  }
+  return Device;
+}
 
 // ============================================
 // PUSH NOTIFICATIONS SERVICE
@@ -18,7 +44,12 @@ function initializeNotificationHandler() {
   }
   
   try {
-    Notifications.setNotificationHandler({
+    const notifications = getNotifications();
+    if (!notifications) {
+      return; // Notifications not available
+    }
+    
+    notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,
         shouldShowList: true,
@@ -60,19 +91,25 @@ export async function registerForPushNotifications(userId?: string): Promise<str
   // Initialize notification handler if not already done
   initializeNotificationHandler();
   
-  if (!Device.isDevice) {
+  const device = getDevice();
+  if (!device || !device.isDevice) {
     // Push notifications require a physical device
     return null;
   }
 
   try {
+    const notifications = getNotifications();
+    if (!notifications) {
+      return null; // Notifications not available
+    }
+    
     // Check existing permissions
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = await notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
     // Request permissions if not granted
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status } = await notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
@@ -83,7 +120,7 @@ export async function registerForPushNotifications(userId?: string): Promise<str
 
     // Get Expo push token
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const token = await Notifications.getExpoPushTokenAsync({
+    const token = await notifications.getExpoPushTokenAsync({
       projectId,
     });
 
@@ -108,7 +145,12 @@ export async function sendLocalNotification(payload: NotificationPayload): Promi
   // Initialize notification handler if not already done
   initializeNotificationHandler();
   
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const notifications = getNotifications();
+  if (!notifications) {
+    throw new Error('Notifications not available');
+  }
+  
+  const notificationId = await notifications.scheduleNotificationAsync({
     content: {
       title: payload.title,
       body: payload.body,
@@ -128,7 +170,12 @@ export async function scheduleNotification(
   payload: NotificationPayload,
   date: Date
 ): Promise<string> {
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const notifications = getNotifications();
+  if (!notifications) {
+    throw new Error('Notifications not available');
+  }
+  
+  const notificationId = await notifications.scheduleNotificationAsync({
     content: {
       title: payload.title,
       body: payload.body,
@@ -148,39 +195,49 @@ export async function scheduleNotification(
  * Cancel a scheduled notification
  */
 export async function cancelNotification(notificationId: string): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(notificationId);
+  const notifications = getNotifications();
+  if (!notifications) return;
+  await notifications.cancelScheduledNotificationAsync(notificationId);
 }
 
 /**
  * Cancel all scheduled notifications
  */
 export async function cancelAllNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const notifications = getNotifications();
+  if (!notifications) return;
+  await notifications.cancelAllScheduledNotificationsAsync();
 }
 
 /**
  * Get all pending notifications
  */
-export async function getPendingNotifications(): Promise<Notifications.NotificationRequest[]> {
-  return Notifications.getAllScheduledNotificationsAsync();
+export async function getPendingNotifications(): Promise<any[]> {
+  const notifications = getNotifications();
+  if (!notifications) return [];
+  return notifications.getAllScheduledNotificationsAsync();
 }
 
 /**
  * Add notification response listener
  */
 export function addNotificationResponseListener(
-  callback: (response: Notifications.NotificationResponse) => void
-): Notifications.Subscription {
-  return Notifications.addNotificationResponseReceivedListener(callback);
+  callback: (response: any) => void
+): any {
+  const notifications = getNotifications();
+  if (!notifications) return { remove: () => {} };
+  return notifications.addNotificationResponseReceivedListener(callback);
 }
 
 /**
  * Add notification received listener
  */
 export function addNotificationReceivedListener(
-  callback: (notification: Notifications.Notification) => void
-): Notifications.Subscription {
-  return Notifications.addNotificationReceivedListener(callback);
+  callback: (notification: any) => void
+): any {
+  const notifications = getNotifications();
+  if (!notifications) return { remove: () => {} };
+  return notifications.addNotificationReceivedListener(callback);
 }
 
 /**
@@ -307,13 +364,17 @@ export async function sendAndSaveNotification(
  * Set badge count
  */
 export async function setBadgeCount(count: number): Promise<void> {
-  await Notifications.setBadgeCountAsync(count);
+  const notifications = getNotifications();
+  if (!notifications) return;
+  await notifications.setBadgeCountAsync(count);
 }
 
 /**
  * Get badge count
  */
 export async function getBadgeCount(): Promise<number> {
-  return Notifications.getBadgeCountAsync();
+  const notifications = getNotifications();
+  if (!notifications) return 0;
+  return notifications.getBadgeCountAsync();
 }
 

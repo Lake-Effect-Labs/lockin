@@ -5,7 +5,20 @@
 // ============================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
+
+// Lazy load NetInfo to prevent crashes at module load time
+let NetInfo: any = null;
+function getNetInfo() {
+  if (!NetInfo) {
+    try {
+      NetInfo = require('@react-native-community/netinfo');
+    } catch (error) {
+      console.warn('NetInfo not available:', error);
+      NetInfo = null;
+    }
+  }
+  return NetInfo;
+}
 
 // ============================================
 // ERROR TYPES
@@ -139,10 +152,17 @@ let networkListeners: ((online: boolean) => void)[] = [];
  */
 export async function initNetworkMonitoring(): Promise<void> {
   try {
-    const state = await NetInfo.fetch();
+    const netInfo = getNetInfo();
+    if (!netInfo) {
+      // NetInfo not available, assume online
+      isOnline = true;
+      return;
+    }
+    
+    const state = await netInfo.fetch();
     isOnline = state.isConnected ?? true;
     
-    NetInfo.addEventListener((state) => {
+    netInfo.addEventListener((state) => {
       const wasOnline = isOnline;
       isOnline = state.isConnected ?? true;
       

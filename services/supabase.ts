@@ -1,7 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+
+// Lazy load SecureStore to prevent crashes at module load time
+let SecureStore: any = null;
+function getSecureStore() {
+  if (!SecureStore) {
+    try {
+      SecureStore = require('expo-secure-store');
+    } catch (error) {
+      console.warn('SecureStore not available:', error);
+      SecureStore = null;
+    }
+  }
+  return SecureStore;
+}
 
 // Custom storage adapter that uses SecureStore on native, AsyncStorage on web
 const ExpoSecureStoreAdapter = {
@@ -10,7 +23,12 @@ const ExpoSecureStoreAdapter = {
       if (Platform.OS === 'web') {
         return AsyncStorage.getItem(key);
       }
-      return await SecureStore.getItemAsync(key);
+      const secureStore = getSecureStore();
+      if (secureStore) {
+        return await secureStore.getItemAsync(key);
+      }
+      // Fallback to AsyncStorage if SecureStore not available
+      return AsyncStorage.getItem(key);
     } catch (error) {
       // Fallback to AsyncStorage if SecureStore fails
       console.warn('SecureStore failed, using AsyncStorage:', error);
@@ -23,7 +41,13 @@ const ExpoSecureStoreAdapter = {
         await AsyncStorage.setItem(key, value);
         return;
       }
-      await SecureStore.setItemAsync(key, value);
+      const secureStore = getSecureStore();
+      if (secureStore) {
+        await secureStore.setItemAsync(key, value);
+        return;
+      }
+      // Fallback to AsyncStorage if SecureStore not available
+      await AsyncStorage.setItem(key, value);
     } catch (error) {
       // Fallback to AsyncStorage if SecureStore fails
       console.warn('SecureStore failed, using AsyncStorage:', error);
@@ -36,7 +60,13 @@ const ExpoSecureStoreAdapter = {
         await AsyncStorage.removeItem(key);
         return;
       }
-      await SecureStore.deleteItemAsync(key);
+      const secureStore = getSecureStore();
+      if (secureStore) {
+        await secureStore.deleteItemAsync(key);
+        return;
+      }
+      // Fallback to AsyncStorage if SecureStore not available
+      await AsyncStorage.removeItem(key);
     } catch (error) {
       // Fallback to AsyncStorage if SecureStore fails
       console.warn('SecureStore failed, using AsyncStorage:', error);
