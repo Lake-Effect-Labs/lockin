@@ -9,15 +9,29 @@ import { updatePushToken, createNotification } from './supabase';
 // Lock-In Fitness Competition App
 // ============================================
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Configure notification behavior (lazy initialization to prevent crashes)
+let notificationHandlerInitialized = false;
+
+function initializeNotificationHandler() {
+  if (notificationHandlerInitialized) {
+    return;
+  }
+  
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    notificationHandlerInitialized = true;
+  } catch (error) {
+    // Don't crash if notifications aren't available
+    console.warn('Failed to set notification handler:', error);
+  }
+}
 
 export type NotificationType = 
   | 'week_start'
@@ -43,6 +57,9 @@ export interface NotificationPayload {
  * Register for push notifications and get token
  */
 export async function registerForPushNotifications(userId?: string): Promise<string | null> {
+  // Initialize notification handler if not already done
+  initializeNotificationHandler();
+  
   if (!Device.isDevice) {
     // Push notifications require a physical device
     return null;
@@ -88,6 +105,9 @@ export async function registerForPushNotifications(userId?: string): Promise<str
  * Send a local notification
  */
 export async function sendLocalNotification(payload: NotificationPayload): Promise<string> {
+  // Initialize notification handler if not already done
+  initializeNotificationHandler();
+  
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: payload.title,
