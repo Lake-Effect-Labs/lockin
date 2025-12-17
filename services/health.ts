@@ -67,35 +67,37 @@ function getAppleHealthKit(): any {
   if (!AppleHealthKitModule) {
     try {
       // Attempting to load react-native-health module
+      // react-native-health exports the default export as the main API
       const healthModule = require('react-native-health');
       
       console.log('📦 react-native-health require() succeeded');
-      console.log('healthModule:', typeof healthModule);
-      console.log('healthModule.default:', typeof healthModule?.default);
+      console.log('healthModule type:', typeof healthModule);
+      console.log('healthModule.default type:', typeof healthModule?.default);
       console.log('healthModule keys:', healthModule ? Object.keys(healthModule).join(', ') : 'none');
       
-      // Try different export patterns - the module might export differently
-      const candidate = healthModule.default || healthModule.AppleHealthKit || healthModule;
+      // react-native-health exports as: { default: AppleHealthKit, Constants: {...} }
+      // OR sometimes just the module directly
+      let candidate = healthModule.default || healthModule;
       
       console.log('candidate type:', typeof candidate);
-      console.log('candidate keys:', candidate ? Object.keys(candidate).slice(0, 15).join(', ') : 'none');
       
-      // Verify this is actually a valid HealthKit module by checking for expected methods
+      // Check if candidate has the HealthKit methods
       if (candidate && typeof candidate.initHealthKit === 'function') {
-        console.log('✅ Valid HealthKit module found (has initHealthKit)');
-        AppleHealthKitModule = candidate;
-      } else if (candidate && typeof candidate.isAvailable === 'function') {
-        console.log('✅ Valid HealthKit module found (has isAvailable)');
+        console.log('✅ Valid HealthKit module found with initHealthKit');
         AppleHealthKitModule = candidate;
       } else if (candidate && candidate.Constants) {
-        console.log('✅ Valid HealthKit module found (has Constants)');
-        AppleHealthKitModule = candidate;
+        console.log('⚠️ Module has Constants but no methods - trying direct module access');
+        // Sometimes the module exports Constants separately from the methods
+        // In this case, the methods might be on the module itself
+        AppleHealthKitModule = healthModule;
       } else {
-        console.error('❌ Module loaded but does not have expected HealthKit methods');
-        console.error('Available methods:', candidate ? Object.keys(candidate) : 'none');
-        // Still try to use it
-        AppleHealthKitModule = candidate;
+        console.error('❌ Module loaded but structure is unexpected');
+        console.error('Candidate keys:', candidate ? Object.keys(candidate).join(', ') : 'none');
+        // Try using the module directly as a last resort
+        AppleHealthKitModule = healthModule;
       }
+      
+      console.log('📋 Final AppleHealthKit keys:', AppleHealthKitModule ? Object.keys(AppleHealthKitModule).slice(0, 20).join(', ') : 'none');
       
       return AppleHealthKitModule;
     } catch (error: any) {
@@ -125,19 +127,37 @@ async function initializeAppleHealth(): Promise<boolean> {
       return false;
     }
     
+    console.log('🔍 Checking AppleHealthKit structure:');
+    console.log('  - Has Constants?', !!AppleHealthKit.Constants);
+    console.log('  - Has initHealthKit?', typeof AppleHealthKit.initHealthKit);
+    console.log('  - Has isAvailable?', typeof AppleHealthKit.isAvailable);
+    
+    // Check if initHealthKit exists
+    if (typeof AppleHealthKit.initHealthKit !== 'function') {
+      console.error('❌ AppleHealthKit.initHealthKit is not a function!');
+      console.error('Available keys:', Object.keys(AppleHealthKit).join(', '));
+      return false;
+    }
+    
     // SKIP isAvailable() check - it's unreliable on some devices
     // Go straight to initHealthKit() which will show the permission dialog
     console.log('⏭️ Skipping isAvailable() check - going straight to initHealthKit()');
     console.log('📱 This will trigger the HealthKit permission dialog');
     
+    // Access Constants - might need to handle different export patterns
+    const Constants = AppleHealthKit.Constants || {};
+    const Permissions = Constants.Permissions || {};
+    
+    console.log('🔍 Constants.Permissions keys:', Object.keys(Permissions).slice(0, 10).join(', '));
+    
     const permissions = {
       permissions: {
         read: [
-          AppleHealthKit.Constants.Permissions.Steps,
-          AppleHealthKit.Constants.Permissions.SleepAnalysis,
-          AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
-          AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
-          AppleHealthKit.Constants.Permissions.Workout,
+          Permissions.Steps,
+          Permissions.SleepAnalysis,
+          Permissions.ActiveEnergyBurned,
+          Permissions.DistanceWalkingRunning,
+          Permissions.Workout,
         ],
         write: [],
       },
