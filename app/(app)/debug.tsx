@@ -502,8 +502,9 @@ export default function DebugScreen() {
                 
                 // Check if module exists
                 try {
-                  const HealthKit = require('@kingstinct/react-native-healthkit');
-                  logs.push('✅ Module loaded successfully');
+                  const healthModule = require('react-native-health');
+                  const HealthKit = healthModule.default || healthModule;
+                  logs.push('✅ Module loaded successfully (react-native-health)');
                   logs.push(`Module keys: ${Object.keys(HealthKit).slice(0, 5).join(', ')}...`);
                   logs.push('');
                 } catch (e: any) {
@@ -575,33 +576,34 @@ export default function DebugScreen() {
                 let logs: string[] = [];
                 
                 logs.push('=== HealthKit Module Test ===');
-                logs.push('Testing: @kingstinct/react-native-healthkit');
+                logs.push('Testing: react-native-health');
                 logs.push('');
                 
                 try {
-                  const HealthKit = require('@kingstinct/react-native-healthkit');
+                  const healthModule = require('react-native-health');
+                  const HealthKit = healthModule.default || healthModule;
                   logs.push(`✅ require() succeeded`);
                   logs.push(`typeof module: ${typeof HealthKit}`);
                   
                   const keys = HealthKit ? Object.keys(HealthKit) : [];
                   logs.push(`Module exports (${keys.length}): ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '...' : ''}`);
                   
-                  if (HealthKit.requestAuthorization) {
-                    logs.push(`✅ requestAuthorization: YES`);
+                  if (HealthKit.initHealthKit) {
+                    logs.push(`✅ initHealthKit: YES`);
                   } else {
-                    logs.push(`❌ requestAuthorization: NO`);
+                    logs.push(`❌ initHealthKit: NO`);
                   }
                   
-                  if (HealthKit.queryQuantitySamples) {
-                    logs.push(`✅ queryQuantitySamples: YES`);
+                  if (HealthKit.getStepCount) {
+                    logs.push(`✅ getStepCount: YES`);
                   } else {
-                    logs.push(`❌ queryQuantitySamples: NO`);
+                    logs.push(`❌ getStepCount: NO`);
                   }
                   
-                  if (HealthKit.HealthDataType) {
-                    logs.push(`✅ HealthDataType: YES`);
+                  if (HealthKit.Constants) {
+                    logs.push(`✅ Constants: YES`);
                   } else {
-                    logs.push(`❌ HealthDataType: NO`);
+                    logs.push(`❌ Constants: NO`);
                   }
                 } catch (requireError: any) {
                   logs.push(`❌ require() FAILED: ${requireError.message}`);
