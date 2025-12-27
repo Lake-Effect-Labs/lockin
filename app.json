@@ -45,9 +45,10 @@
         }
       ],
       [
-        "react-native-health",
+        "@kingstinct/react-native-healthkit",
         {
-          "isClinicalDataEnabled": false
+          "healthSharePermission": "Lock-In uses Health data to power fitness leagues and insights.",
+          "healthUpdatePermission": "Lock-In writes workout data you log."
         }
       ],
       "expo-background-fetch",

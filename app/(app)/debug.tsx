@@ -576,59 +576,47 @@ export default function DebugScreen() {
                 let logs: string[] = [];
                 
                 logs.push('=== HealthKit Module Test ===');
-                logs.push('Testing: react-native-health');
+                logs.push('Testing: @kingstinct/react-native-healthkit');
                 logs.push('');
                 
                 try {
-                  const healthModule = require('react-native-health');
-                  const HealthKit = healthModule.default || healthModule;
+                  const healthModule = require('@kingstinct/react-native-healthkit');
                   logs.push(`✅ JS MODULE: require() succeeded`);
-                  logs.push(`typeof: ${typeof HealthKit}`);
+                  logs.push(`typeof: ${typeof healthModule}`);
                   logs.push('');
                   
-                  const keys = HealthKit ? Object.keys(HealthKit) : [];
+                  const keys = healthModule ? Object.keys(healthModule) : [];
                   logs.push(`NATIVE BRIDGE CHECK:`);
                   logs.push(`Exports found: ${keys.length}`);
+                  logs.push(`Sample: ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '...' : ''}`);
+                  logs.push('');
                   
-                  if (keys.length === 0) {
-                    logs.push('');
-                    logs.push(`❌ NATIVE NOT LINKED!`);
-                    logs.push(`JS loads but native side missing`);
-                    logs.push('');
-                    logs.push('POSSIBLE CAUSES:');
-                    logs.push('1. New Architecture enabled');
-                    logs.push('2. Native module not compiled');
-                    logs.push('3. Config plugin not applied');
+                  // Check critical native methods
+                  const nativeChecks = [
+                    { name: 'requestAuthorization', fn: healthModule.requestAuthorization },
+                    { name: 'getLatestSample', fn: healthModule.getLatestSample },
+                    { name: 'querySampleType', fn: healthModule.querySampleType },
+                    { name: 'getSample', fn: healthModule.getSample },
+                  ];
+                  
+                  let nativeWorking = 0;
+                  nativeChecks.forEach(check => {
+                    const works = typeof check.fn !== 'undefined';
+                    logs.push(`${works ? '✅' : '❌'} ${check.name}: ${works ? 'YES' : 'NO'}`);
+                    if (works) nativeWorking++;
+                  });
+                  
+                  logs.push('');
+                  if (nativeWorking === nativeChecks.length) {
+                    logs.push('🎉 NATIVE FULLY LINKED!');
+                    logs.push('✅ All modern Kingstinct APIs available');
+                    logs.push('HealthKit ready to use');
+                  } else if (nativeWorking > 0) {
+                    logs.push('⚠️  PARTIAL NATIVE BRIDGE');
+                    logs.push(`Only ${nativeWorking}/${nativeChecks.length} methods available`);
                   } else {
-                    logs.push(`Sample: ${keys.slice(0, 6).join(', ')}...`);
-                    logs.push('');
-                    
-                    // Check critical native methods
-                    const nativeChecks = [
-                      { name: 'initHealthKit', fn: HealthKit.initHealthKit },
-                      { name: 'getStepCount', fn: HealthKit.getStepCount },
-                      { name: 'getSleepSamples', fn: HealthKit.getSleepSamples },
-                      { name: 'Constants', fn: HealthKit.Constants },
-                    ];
-                    
-                    let nativeWorking = 0;
-                    nativeChecks.forEach(check => {
-                      const works = typeof check.fn !== 'undefined';
-                      logs.push(`${works ? '✅' : '❌'} ${check.name}: ${works ? 'YES' : 'NO'}`);
-                      if (works) nativeWorking++;
-                    });
-                    
-                    logs.push('');
-                    if (nativeWorking === nativeChecks.length) {
-                      logs.push('🎉 NATIVE FULLY LINKED!');
-                      logs.push('HealthKit ready to use');
-                    } else if (nativeWorking > 0) {
-                      logs.push('⚠️  PARTIAL NATIVE BRIDGE');
-                      logs.push('Some methods missing');
-                    } else {
-                      logs.push('❌ NO NATIVE METHODS');
-                      logs.push('Bridge completely broken');
-                    }
+                    logs.push('❌ NO NATIVE METHODS');
+                    logs.push('Bridge completely broken');
                   }
                 } catch (requireError: any) {
                   logs.push(`❌ JS MODULE: require() FAILED`);
@@ -639,7 +627,7 @@ export default function DebugScreen() {
                   logs.push('FIX: npm run build:testflight');
                 }
                 
-                Alert.alert('🔬 Native Module Test', logs.join('\n'));
+                Alert.alert('🔬 Native Module Test (Kingstinct)', logs.join('\n'));
               } catch (error: any) {
                 Alert.alert('❌ Test Error', `Failed: ${error.message}`);
               }
