@@ -8,6 +8,13 @@ import { FitnessMetrics } from './scoring';
 // Using @kingstinct/react-native-healthkit (New Architecture compatible, Nitro modules)
 // ============================================
 
+// CRITICAL: Wrap everything in try/catch to prevent crash-on-load
+try {
+  console.log('📦 [Health Service] Initializing...');
+} catch (e) {
+  console.error('🚨 [Health Service] Failed to initialize:', e);
+}
+
 export interface HealthPermissions {
   steps: boolean;
   sleep: boolean;
@@ -25,12 +32,13 @@ const isExpoGo = Constants?.executionEnvironment === 'storeClient';
 
 // Cache the HealthKit module
 let HealthKit: any = null;
+let loadError: any = null;
 
 /**
  * Get the Apple HealthKit module (cached, lazy-loaded)
  */
 function getHealthKit(): any {
-  if (!HealthKit) {
+  if (!HealthKit && !loadError) {
     try {
       console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       const healthModule = require('@kingstinct/react-native-healthkit');
@@ -45,74 +53,99 @@ function getHealthKit(): any {
       
       return HealthKit;
     } catch (error: any) {
+      loadError = error; // Cache the error to avoid repeated attempts
+      
       console.error('❌ CRITICAL: Failed to load HealthKit module');
-      console.error('   - Error:', error.message);
+      console.error('   - Error message:', error?.message);
+      console.error('   - Error code:', error?.code);
+      console.error('   - Full error:', JSON.stringify(error, null, 2));
       console.error('');
       console.error('💡 This means native module NOT in build!');
       console.error('🔧 Fix: eas build --platform ios --profile testflight --clear-cache');
+      
+      // Don't re-throw - let app continue without HealthKit
       return null;
     }
   }
+  
+  if (loadError) {
+    return null; // Return null if we already tried and failed
+  }
+  
   return HealthKit;
 }
 
 /**
  * Initialize health data access (iOS only)
  * Returns true if health data is available
+ * SAFE: Never throws - catches all errors internally
  */
 export async function initializeHealth(): Promise<boolean> {
-  console.log('');
-  console.log('='.repeat(60));
-  console.log('🏥 HEALTHKIT INITIALIZATION - DETAILED DIAGNOSTIC LOG');
-  console.log('='.repeat(60));
-  console.log('Timestamp:', new Date().toISOString());
-  console.log('');
-  
-  // Step 1: Platform check
-  console.log('📱 STEP 1: Platform Check');
-  console.log('   - Platform.OS:', Platform.OS);
-  if (Platform.OS !== 'ios') {
-    console.log('   ❌ FAILED: Not iOS');
-    console.log('='.repeat(60));
-    return false;
-  }
-  console.log('   ✅ PASSED: iOS detected');
-  console.log('');
-
-  // Step 2: Expo Go check
-  console.log('📱 STEP 2: Execution Environment Check');
-  console.log('   - executionEnvironment:', Constants?.executionEnvironment);
-  console.log('   - isExpoGo:', isExpoGo);
-  if (isExpoGo) {
-    console.log('   ❌ FAILED: Running in Expo Go (native modules unavailable)');
-    console.log('   🔧 Solution: Use EAS Build');
-    console.log('='.repeat(60));
-    return false;
-  }
-  console.log('   ✅ PASSED: Standalone build');
-  console.log('');
-
-  // Step 3: Load module
-  console.log('📦 STEP 3: Load HealthKit Module');
-  const module = getHealthKit();
-  
-  if (!module) {
-    console.log('   ❌ FAILED: Module returned null');
-    console.log('   💡 Native module not included in build');
-    console.log('='.repeat(60));
-    return false;
-  }
-  console.log('   ✅ PASSED: Module loaded');
-  console.log('');
-
-  // Step 4: Request authorization
-  console.log('🔐 STEP 4: Request HealthKit Authorization');
-  console.log('   - Requesting permissions for: StepCount, SleepAnalysis, ActiveEnergyBurned, DistanceWalkingRunning');
-  console.log('');
-  
   try {
-    console.log('🚀 STEP 5: Request Authorization');
-    console.log('   - Calling: HealthKit.requestAuthorization()');
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('🏥 HEALTHKIT INITIALIZATION - DETAILED DIAGNOSTIC LOG');
+    console.log('='.repeat(60));
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('');
+    
+    // Step 1: Platform check
+    console.log('📱 STEP 1: Platform Check');
+    console.log('   - Platform.OS:', Platform.OS);
+    if (Platform.OS !== 'ios') {
+      console.log('   ❌ FAILED: Not iOS');
+      console.log('='.repeat(60));
+      return false;
+    }
+    console.log('   ✅ PASSED: iOS detected');
+    console.log('');
+
+    // Step 2: Expo Go check
+    console.log('📱 STEP 2: Execution Environment Check');
+    console.log('   - executionEnvironment:', Constants?.executionEnvironment);
+    console.log('   - isExpoGo:', isExpoGo);
+    if (isExpoGo) {
+      console.log('   ❌ FAILED: Running in Expo Go (native modules unavailable)');
+      console.log('   🔧 Solution: Use EAS Build');
+      console.log('='.repeat(60));
+      return false;
+    }
+    console.log('   ✅ PASSED: Standalone build');
+    console.log('');
+
+    // Step 3: Load module
+    console.log('📦 STEP 3: Load HealthKit Module');
+    const module = getHealthKit();
+    
+    if (!module) {
+      console.log('   ❌ FAILED: Module returned null');
+      console.log('   💡 Native module not included in build');
+      console.log('='.repeat(60));
+      return false;
+    }
+    console.log('   ✅ PASSED: Module loaded');
+    console.log('');
+
+    // Step 4: Check if requestAuthorization exists
+    console.log('📱 STEP 4: Check requestAuthorization availability');
+    
+    if (typeof module.requestAuthorization !== 'function') {
+      console.log('   ❌ FAILED: requestAuthorization is not a function');
+      console.log('   - typeof:', typeof module.requestAuthorization);
+      console.log('   - Available methods:', Object.keys(module || {}).slice(0, 15).join(', '));
+      console.log('='.repeat(60));
+      return false;
+    }
+    console.log('   ✅ PASSED: requestAuthorization available');
+    console.log('');
+
+    // Step 5: Request authorization
+    console.log('🔐 STEP 5: Request HealthKit Authorization');
+    console.log('   - Requesting permissions for: StepCount, SleepAnalysis, ActiveEnergyBurned, DistanceWalkingRunning');
+    console.log('');
+    
+    console.log('🚀 STEP 6: Initialize HealthKit');
+    console.log('   - Calling: module.requestAuthorization()');
     console.log('   - Start time:', new Date().toISOString());
     console.log('');
     console.log('   ⏳ WAITING FOR USER INTERACTION...');
@@ -122,7 +155,7 @@ export async function initializeHealth(): Promise<boolean> {
     const startAuthTime = Date.now();
     
     // Modern Kingstinct API - no callbacks, uses async/await
-    await HealthKit.requestAuthorization({
+    await module.requestAuthorization({
       read: [
         'StepCount',
         'DistanceWalkingRunning',
@@ -165,10 +198,18 @@ export async function initializeHealth(): Promise<boolean> {
     
     return true;
   } catch (error: any) {
-    console.log('   ❌ AUTHORIZATION FAILED with error');
-    console.log('   Error message:', error.message);
-    console.log('');
-    console.log('='.repeat(60));
+    console.error('');
+    console.error('='.repeat(60));
+    console.error('❌ HEALTHKIT INITIALIZATION CRASHED');
+    console.error('='.repeat(60));
+    console.error('Error:', error?.message);
+    console.error('Error code:', error?.code);
+    console.error('Error stack:', error?.stack?.substring(0, 500));
+    console.error('Full error object:', JSON.stringify(error, null, 2));
+    console.error('='.repeat(60));
+    console.error('');
+    
+    // Never throw - let app continue
     return false;
   }
 }
