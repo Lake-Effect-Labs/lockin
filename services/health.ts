@@ -141,9 +141,9 @@ export async function initializeHealth(): Promise<boolean> {
 
     // Step 5: Request authorization
     console.log('🔐 STEP 5: Request HealthKit Authorization');
-    console.log('   - Requesting permissions for: StepCount, SleepAnalysis, ActiveEnergyBurned, DistanceWalkingRunning');
+    console.log('   - Requesting permissions for: StepCount, SleepAnalysis, ActiveEnergyBurned, DistanceWalkingRunning, Workout');
     console.log('');
-    
+
     console.log('🚀 STEP 6: Initialize HealthKit');
     console.log('   - Calling: module.requestAuthorization()');
     console.log('   - Start time:', new Date().toISOString());
@@ -151,9 +151,9 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('   ⏳ WAITING FOR USER INTERACTION...');
     console.log('   💡 iOS permission dialog should appear NOW');
     console.log('');
-    
+
     const startAuthTime = Date.now();
-    
+
     // Modern Kingstinct API - no callbacks, uses async/await
     await module.requestAuthorization({
       read: [
@@ -161,6 +161,7 @@ export async function initializeHealth(): Promise<boolean> {
         'DistanceWalkingRunning',
         'ActiveEnergyBurned',
         'SleepAnalysis',
+        'Workout',
       ],
       write: [],
     });
@@ -419,19 +420,63 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
 }
 
 /**
+ * Get workout count for a date
+ */
+export async function getDailyWorkouts(date: Date = new Date()): Promise<number> {
+  const module = getHealthKit();
+  if (!module) {
+    console.log('⚠️ HealthKit not available, returning 0 workouts');
+    return 0;
+  }
+
+  try {
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Query workout samples
+    let results;
+
+    if (typeof module.queryWorkoutSamples === 'function') {
+      results = await module.queryWorkoutSamples({
+        startDate,
+        endDate,
+      });
+    }
+    // Fallback: try querySamples with Workout type
+    else if (typeof module.querySamples === 'function') {
+      results = await module.querySamples({
+        sampleType: 'Workout',
+        startDate,
+        endDate,
+      });
+    }
+
+    // Return the count of workouts
+    return results?.length || 0;
+  } catch (err: any) {
+    console.error('❌ Error getting workouts:', err);
+    return 0;
+  }
+}
+
+/**
  * Get all daily fitness metrics
  */
 export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHealthData> {
   console.log('📊 Getting daily metrics for', date.toLocaleDateString());
-  
-  const [steps, sleep, calories, distance] = await Promise.all([
+
+  const [steps, sleep, calories, distance, workouts] = await Promise.all([
     getDailySteps(date),
     getDailySleep(date),
     getDailyCalories(date),
     getDailyDistance(date),
+    getDailyWorkouts(date),
   ]);
 
-  console.log('📊 Results:', { steps, sleep, calories, distance });
+  console.log('📊 Results:', { steps, sleep, calories, distance, workouts });
 
   return {
     date: date.toISOString().split('T')[0],
@@ -439,7 +484,7 @@ export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHea
     sleepHours: sleep,
     calories,
     distance: distance,
-    workouts: 0, // TODO: Implement workout tracking
+    workouts,
   };
 }
 
