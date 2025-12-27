@@ -582,38 +582,64 @@ export default function DebugScreen() {
                 try {
                   const healthModule = require('react-native-health');
                   const HealthKit = healthModule.default || healthModule;
-                  logs.push(`✅ require() succeeded`);
-                  logs.push(`typeof module: ${typeof HealthKit}`);
+                  logs.push(`✅ JS MODULE: require() succeeded`);
+                  logs.push(`typeof: ${typeof HealthKit}`);
+                  logs.push('');
                   
                   const keys = HealthKit ? Object.keys(HealthKit) : [];
-                  logs.push(`Module exports (${keys.length}): ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '...' : ''}`);
+                  logs.push(`NATIVE BRIDGE CHECK:`);
+                  logs.push(`Exports found: ${keys.length}`);
                   
-                  if (HealthKit.initHealthKit) {
-                    logs.push(`✅ initHealthKit: YES`);
+                  if (keys.length === 0) {
+                    logs.push('');
+                    logs.push(`❌ NATIVE NOT LINKED!`);
+                    logs.push(`JS loads but native side missing`);
+                    logs.push('');
+                    logs.push('POSSIBLE CAUSES:');
+                    logs.push('1. New Architecture enabled');
+                    logs.push('2. Native module not compiled');
+                    logs.push('3. Config plugin not applied');
                   } else {
-                    logs.push(`❌ initHealthKit: NO`);
-                  }
-                  
-                  if (HealthKit.getStepCount) {
-                    logs.push(`✅ getStepCount: YES`);
-                  } else {
-                    logs.push(`❌ getStepCount: NO`);
-                  }
-                  
-                  if (HealthKit.Constants) {
-                    logs.push(`✅ Constants: YES`);
-                  } else {
-                    logs.push(`❌ Constants: NO`);
+                    logs.push(`Sample: ${keys.slice(0, 6).join(', ')}...`);
+                    logs.push('');
+                    
+                    // Check critical native methods
+                    const nativeChecks = [
+                      { name: 'initHealthKit', fn: HealthKit.initHealthKit },
+                      { name: 'getStepCount', fn: HealthKit.getStepCount },
+                      { name: 'getSleepSamples', fn: HealthKit.getSleepSamples },
+                      { name: 'Constants', fn: HealthKit.Constants },
+                    ];
+                    
+                    let nativeWorking = 0;
+                    nativeChecks.forEach(check => {
+                      const works = typeof check.fn !== 'undefined';
+                      logs.push(`${works ? '✅' : '❌'} ${check.name}: ${works ? 'YES' : 'NO'}`);
+                      if (works) nativeWorking++;
+                    });
+                    
+                    logs.push('');
+                    if (nativeWorking === nativeChecks.length) {
+                      logs.push('🎉 NATIVE FULLY LINKED!');
+                      logs.push('HealthKit ready to use');
+                    } else if (nativeWorking > 0) {
+                      logs.push('⚠️  PARTIAL NATIVE BRIDGE');
+                      logs.push('Some methods missing');
+                    } else {
+                      logs.push('❌ NO NATIVE METHODS');
+                      logs.push('Bridge completely broken');
+                    }
                   }
                 } catch (requireError: any) {
-                  logs.push(`❌ require() FAILED: ${requireError.message}`);
+                  logs.push(`❌ JS MODULE: require() FAILED`);
+                  logs.push(`Error: ${requireError.message}`);
                   logs.push('');
-                  logs.push('💡 Native module NOT in build');
+                  logs.push('💡 Module NOT in bundle');
                   logs.push('');
-                  logs.push('FIX: Rebuild with --clear-cache');
+                  logs.push('FIX: npm run build:testflight');
                 }
                 
-                Alert.alert('🔬 Module Loading Test', logs.join('\n'));
+                Alert.alert('🔬 Native Module Test', logs.join('\n'));
               } catch (error: any) {
                 Alert.alert('❌ Test Error', `Failed: ${error.message}`);
               }
@@ -622,7 +648,7 @@ export default function DebugScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="bug" size={20} color={colors.status.warning} />
-            <Text style={styles.secondaryText}>Test Module Loading</Text>
+            <Text style={styles.secondaryText}>Test Native Linking</Text>
           </TouchableOpacity>
           
           {/* Health Test Results */}

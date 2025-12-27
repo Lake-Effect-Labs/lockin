@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.lockin.app",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In needs access to your health data to track your fitness metrics and compete in leagues.",
         "NSHealthUpdateUsageDescription": "Lock-In needs permission to update your health data.",
@@ -44,7 +44,12 @@
           "color": "#FF6B35"
         }
       ],
-      "react-native-health",
+      [
+        "react-native-health",
+        {
+          "isClinicalDataEnabled": false
+        }
+      ],
       "expo-background-fetch",
       "expo-task-manager",
       [

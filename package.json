@@ -9,6 +9,8 @@
     "web": "expo start --web",
     "build:android": "eas build --platform android",
     "build:ios": "eas build --platform ios",
+    "build:testflight": "eas build --platform ios --profile testflight --clear-cache",
+    "verify:healthkit": "node scripts/verify-healthkit-config.js",
     "submit:android": "eas submit --platform android",
     "submit:ios": "eas submit --platform ios",
     "clean": "if exist node_modules\\.cache rmdir /s /q node_modules\\.cache && if exist .expo rmdir /s /q .expo && npx expo install --fix",
