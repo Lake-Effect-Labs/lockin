@@ -502,9 +502,9 @@ export default function DebugScreen() {
                 
                 // Check if module exists
                 try {
-                  const healthModule = require('react-native-health');
+                  const healthModule = require('@kingstinct/react-native-healthkit');
                   const HealthKit = healthModule.default || healthModule;
-                  logs.push('✅ Module loaded successfully (react-native-health)');
+                  logs.push('✅ Module loaded successfully (@kingstinct/react-native-healthkit)');
                   logs.push(`Module keys: ${Object.keys(HealthKit).slice(0, 5).join(', ')}...`);
                   logs.push('');
                 } catch (e: any) {
