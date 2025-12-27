@@ -23,7 +23,11 @@
         "NSHealthShareUsageDescription": "Lock-In uses Health data to power fitness leagues and insights.",
         "NSHealthUpdateUsageDescription": "Lock-In writes workout data you log.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["fetch", "processing"]
+        "UIBackgroundModes": ["fetch", "processing"],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.lockin.background-sync",
+          "com.lockin.daily-sync"
+        ]
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
