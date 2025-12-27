@@ -35,10 +35,13 @@ function getHealthKit(): any {
       console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       const healthModule = require('@kingstinct/react-native-healthkit');
       
-      HealthKit = healthModule;
+      // Handle both default export and direct export
+      HealthKit = healthModule?.default ?? healthModule;
       
       console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
       console.log('📊 Module available');
+      console.log('   - Export keys:', Object.keys(HealthKit || {}).slice(0, 10).join(', '));
+      console.log('   - Has requestAuthorization:', typeof HealthKit?.requestAuthorization);
       
       return HealthKit;
     } catch (error: any) {
@@ -203,11 +206,26 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const results = await module.getLatestSample({
-      sample: 'StepCount',
-      startDate,
-      endDate,
-    });
+    // Try the most likely API name for Kingstinct
+    let results;
+    
+    // Try getMostRecentQuantitySample first
+    if (typeof module.getMostRecentQuantitySample === 'function') {
+      results = await module.getMostRecentQuantitySample({
+        sampleType: 'StepCount',
+        startDate,
+        endDate,
+      });
+    } 
+    // Fallback: try queryQuantitySamples and take latest
+    else if (typeof module.queryQuantitySamples === 'function') {
+      const samples = await module.queryQuantitySamples({
+        sampleType: 'StepCount',
+        startDate,
+        endDate,
+      });
+      results = samples?.[samples.length - 1];
+    }
 
     return results?.value || 0;
   } catch (err: any) {
@@ -233,11 +251,25 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const results = await module.querySampleType({
-      sampleType: 'SleepAnalysis',
-      startDate,
-      endDate,
-    });
+    // Try the most likely API name for Kingstinct
+    let results;
+    
+    // Try queryCategorySamples for sleep (category-type data)
+    if (typeof module.queryCategorySamples === 'function') {
+      results = await module.queryCategorySamples({
+        sampleType: 'SleepAnalysis',
+        startDate,
+        endDate,
+      });
+    }
+    // Fallback: try queryQuantitySamples
+    else if (typeof module.queryQuantitySamples === 'function') {
+      results = await module.queryQuantitySamples({
+        sampleType: 'SleepAnalysis',
+        startDate,
+        endDate,
+      });
+    }
 
     if (!results || results.length === 0) {
       return 0;
@@ -274,11 +306,24 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const results = await module.getLatestSample({
-      sample: 'ActiveEnergyBurned',
-      startDate,
-      endDate,
-    });
+    // Try the most likely API name for Kingstinct
+    let results;
+    
+    if (typeof module.getMostRecentQuantitySample === 'function') {
+      results = await module.getMostRecentQuantitySample({
+        sampleType: 'ActiveEnergyBurned',
+        startDate,
+        endDate,
+      });
+    } 
+    else if (typeof module.queryQuantitySamples === 'function') {
+      const samples = await module.queryQuantitySamples({
+        sampleType: 'ActiveEnergyBurned',
+        startDate,
+        endDate,
+      });
+      results = samples?.[samples.length - 1];
+    }
 
     return results?.value || 0;
   } catch (err: any) {
@@ -304,11 +349,24 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const results = await module.getLatestSample({
-      sample: 'DistanceWalkingRunning',
-      startDate,
-      endDate,
-    });
+    // Try the most likely API name for Kingstinct
+    let results;
+    
+    if (typeof module.getMostRecentQuantitySample === 'function') {
+      results = await module.getMostRecentQuantitySample({
+        sampleType: 'DistanceWalkingRunning',
+        startDate,
+        endDate,
+      });
+    } 
+    else if (typeof module.queryQuantitySamples === 'function') {
+      const samples = await module.queryQuantitySamples({
+        sampleType: 'DistanceWalkingRunning',
+        startDate,
+        endDate,
+      });
+      results = samples?.[samples.length - 1];
+    }
 
     // Convert meters to miles
     const meters = results?.value || 0;

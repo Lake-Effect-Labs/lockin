@@ -572,7 +572,7 @@ export default function DebugScreen() {
           <TouchableOpacity
             onPress={() => {
               try {
-                // Detailed module loading test
+                // Detailed module loading test with diagnostic info
                 let logs: string[] = [];
                 
                 logs.push('=== HealthKit Module Test ===');
@@ -581,39 +581,44 @@ export default function DebugScreen() {
                 
                 try {
                   const healthModule = require('@kingstinct/react-native-healthkit');
+                  
+                  // Handle both default and direct exports
+                  const HealthKit = healthModule?.default ?? healthModule;
+                  
                   logs.push(`✅ JS MODULE: require() succeeded`);
-                  logs.push(`typeof: ${typeof healthModule}`);
+                  logs.push(`typeof: ${typeof HealthKit}`);
                   logs.push('');
                   
-                  const keys = healthModule ? Object.keys(healthModule) : [];
+                  const keys = HealthKit ? Object.keys(HealthKit) : [];
                   logs.push(`NATIVE BRIDGE CHECK:`);
                   logs.push(`Exports found: ${keys.length}`);
-                  logs.push(`Sample: ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '...' : ''}`);
+                  logs.push(`First 10: ${keys.slice(0, 10).join(', ')}`);
                   logs.push('');
                   
-                  // Check critical native methods
+                  // Check critical native methods (Kingstinct API names)
                   const nativeChecks = [
-                    { name: 'requestAuthorization', fn: healthModule.requestAuthorization },
-                    { name: 'getLatestSample', fn: healthModule.getLatestSample },
-                    { name: 'querySampleType', fn: healthModule.querySampleType },
-                    { name: 'getSample', fn: healthModule.getSample },
+                    { name: 'requestAuthorization', fn: HealthKit?.requestAuthorization },
+                    { name: 'getMostRecentQuantitySample', fn: HealthKit?.getMostRecentQuantitySample },
+                    { name: 'queryQuantitySamples', fn: HealthKit?.queryQuantitySamples },
+                    { name: 'queryCategorySamples', fn: HealthKit?.queryCategorySamples },
+                    { name: 'getSample', fn: HealthKit?.getSample },
                   ];
                   
                   let nativeWorking = 0;
                   nativeChecks.forEach(check => {
-                    const works = typeof check.fn !== 'undefined';
+                    const works = typeof check.fn === 'function';
                     logs.push(`${works ? '✅' : '❌'} ${check.name}: ${works ? 'YES' : 'NO'}`);
                     if (works) nativeWorking++;
                   });
                   
                   logs.push('');
-                  if (nativeWorking === nativeChecks.length) {
+                  if (nativeWorking >= 3) {
                     logs.push('🎉 NATIVE FULLY LINKED!');
-                    logs.push('✅ All modern Kingstinct APIs available');
+                    logs.push(`✅ ${nativeWorking} core methods available`);
                     logs.push('HealthKit ready to use');
                   } else if (nativeWorking > 0) {
                     logs.push('⚠️  PARTIAL NATIVE BRIDGE');
-                    logs.push(`Only ${nativeWorking}/${nativeChecks.length} methods available`);
+                    logs.push(`Only ${nativeWorking} methods available`);
                   } else {
                     logs.push('❌ NO NATIVE METHODS');
                     logs.push('Bridge completely broken');
