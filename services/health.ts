@@ -233,6 +233,7 @@ export function isHealthAvailable(): boolean {
 
 /**
  * Get daily steps for a date
+ * Steps need to be aggregated (summed) from all samples throughout the day
  */
 export async function getDailySteps(date: Date = new Date()): Promise<number> {
   const module = getHealthKit();
@@ -244,32 +245,40 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
   try {
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
-    
+
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Try the most likely API name for Kingstinct
-    let results;
-    
-    // Try getMostRecentQuantitySample first
-    if (typeof module.getMostRecentQuantitySample === 'function') {
-      results = await module.getMostRecentQuantitySample({
-        sampleType: 'StepCount',
-        startDate,
-        endDate,
-      });
-    } 
-    // Fallback: try queryQuantitySamples and take latest
-    else if (typeof module.queryQuantitySamples === 'function') {
+    // For steps, we need to SUM all samples (not just get the latest)
+    // Each step sample represents a segment of steps (e.g., from a walk)
+    if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples({
-        sampleType: 'StepCount',
-        startDate,
-        endDate,
+        quantityType: 'stepCount',
+        from: startDate,
+        to: endDate,
       });
-      results = samples?.[samples.length - 1];
+
+      // Sum all step samples for the day
+      if (samples && Array.isArray(samples)) {
+        const total = samples.reduce((sum: number, sample: any) => {
+          return sum + (sample?.quantity || sample?.value || 0);
+        }, 0);
+        return Math.round(total);
+      }
     }
 
-    return results?.value || 0;
+    // Fallback: try queryStatisticsForQuantity if available (gives sum directly)
+    if (typeof module.queryStatisticsForQuantity === 'function') {
+      const stats = await module.queryStatisticsForQuantity({
+        quantityType: 'stepCount',
+        from: startDate,
+        to: endDate,
+        options: ['cumulativeSum'],
+      });
+      return Math.round(stats?.sumQuantity?.quantity || 0);
+    }
+
+    return 0;
   } catch (err: any) {
     console.error('❌ Error getting steps:', err);
     return 0;
@@ -277,7 +286,8 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 }
 
 /**
- * Get sleep hours for a date  
+ * Get sleep hours for a date
+ * Sleep data is stored as category samples with start/end times
  */
 export async function getDailySleep(date: Date = new Date()): Promise<number> {
   const module = getHealthKit();
@@ -287,29 +297,23 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
   }
 
   try {
+    // For sleep, we look at the night before (sleep ending on this date)
+    // Sleep from the previous night typically ends in the morning of the target date
     const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
-    
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(18, 0, 0, 0); // Start from 6 PM previous day
+
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Try the most likely API name for Kingstinct
-    let results;
-    
+    let results: any[] = [];
+
     // Try queryCategorySamples for sleep (category-type data)
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples({
-        sampleType: 'SleepAnalysis',
-        startDate,
-        endDate,
-      });
-    }
-    // Fallback: try queryQuantitySamples
-    else if (typeof module.queryQuantitySamples === 'function') {
-      results = await module.queryQuantitySamples({
-        sampleType: 'SleepAnalysis',
-        startDate,
-        endDate,
+        categoryType: 'sleepAnalysis',
+        from: startDate,
+        to: endDate,
       });
     }
 
@@ -318,9 +322,16 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     }
 
     // Sum up all sleep periods (in hours)
+    // Filter for actual sleep (not "inBed" which is just time in bed)
     const totalMinutes = results.reduce((sum: number, sample: any) => {
-      const start = new Date(sample.startDate).getTime();
-      const end = new Date(sample.endDate).getTime();
+      // Skip "inBed" samples - only count actual sleep
+      const value = sample?.value || sample?.category;
+      if (value === 0 || value === 'inBed') {
+        return sum;
+      }
+
+      const start = new Date(sample.startDate || sample.from).getTime();
+      const end = new Date(sample.endDate || sample.to).getTime();
       return sum + (end - start) / (1000 * 60);
     }, 0);
 
@@ -333,6 +344,7 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
 
 /**
  * Get active calories for a date
+ * Calories need to be aggregated (summed) from all samples throughout the day
  */
 export async function getDailyCalories(date: Date = new Date()): Promise<number> {
   const module = getHealthKit();
@@ -344,30 +356,39 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
   try {
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
-    
+
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Try the most likely API name for Kingstinct
-    let results;
-    
-    if (typeof module.getMostRecentQuantitySample === 'function') {
-      results = await module.getMostRecentQuantitySample({
-        sampleType: 'ActiveEnergyBurned',
-        startDate,
-        endDate,
-      });
-    } 
-    else if (typeof module.queryQuantitySamples === 'function') {
+    // For calories, we need to SUM all samples (not just get the latest)
+    if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples({
-        sampleType: 'ActiveEnergyBurned',
-        startDate,
-        endDate,
+        quantityType: 'activeEnergyBurned',
+        from: startDate,
+        to: endDate,
       });
-      results = samples?.[samples.length - 1];
+
+      // Sum all calorie samples for the day
+      if (samples && Array.isArray(samples)) {
+        const total = samples.reduce((sum: number, sample: any) => {
+          return sum + (sample?.quantity || sample?.value || 0);
+        }, 0);
+        return Math.round(total);
+      }
     }
 
-    return results?.value || 0;
+    // Fallback: try queryStatisticsForQuantity if available
+    if (typeof module.queryStatisticsForQuantity === 'function') {
+      const stats = await module.queryStatisticsForQuantity({
+        quantityType: 'activeEnergyBurned',
+        from: startDate,
+        to: endDate,
+        options: ['cumulativeSum'],
+      });
+      return Math.round(stats?.sumQuantity?.quantity || 0);
+    }
+
+    return 0;
   } catch (err: any) {
     console.error('❌ Error getting calories:', err);
     return 0;
@@ -376,6 +397,7 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
 
 /**
  * Get distance walked/run for a date
+ * Distance needs to be aggregated (summed) from all samples throughout the day
  */
 export async function getDailyDistance(date: Date = new Date()): Promise<number> {
   const module = getHealthKit();
@@ -387,32 +409,41 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
   try {
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
-    
+
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Try the most likely API name for Kingstinct
-    let results;
-    
-    if (typeof module.getMostRecentQuantitySample === 'function') {
-      results = await module.getMostRecentQuantitySample({
-        sampleType: 'DistanceWalkingRunning',
-        startDate,
-        endDate,
-      });
-    } 
-    else if (typeof module.queryQuantitySamples === 'function') {
+    let totalMeters = 0;
+
+    // For distance, we need to SUM all samples (not just get the latest)
+    if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples({
-        sampleType: 'DistanceWalkingRunning',
-        startDate,
-        endDate,
+        quantityType: 'distanceWalkingRunning',
+        from: startDate,
+        to: endDate,
       });
-      results = samples?.[samples.length - 1];
+
+      // Sum all distance samples for the day
+      if (samples && Array.isArray(samples)) {
+        totalMeters = samples.reduce((sum: number, sample: any) => {
+          return sum + (sample?.quantity || sample?.value || 0);
+        }, 0);
+      }
+    }
+
+    // Fallback: try queryStatisticsForQuantity if available
+    if (totalMeters === 0 && typeof module.queryStatisticsForQuantity === 'function') {
+      const stats = await module.queryStatisticsForQuantity({
+        quantityType: 'distanceWalkingRunning',
+        from: startDate,
+        to: endDate,
+        options: ['cumulativeSum'],
+      });
+      totalMeters = stats?.sumQuantity?.quantity || 0;
     }
 
     // Convert meters to miles
-    const meters = results?.value || 0;
-    return meters / 1609.34;
+    return totalMeters / 1609.34;
   } catch (err: any) {
     console.error('❌ Error getting distance:', err);
     return 0;
@@ -436,21 +467,13 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Query workout samples
-    let results;
+    let results: any[] = [];
 
+    // Query workout samples using Kingstinct API
     if (typeof module.queryWorkoutSamples === 'function') {
       results = await module.queryWorkoutSamples({
-        startDate,
-        endDate,
-      });
-    }
-    // Fallback: try querySamples with Workout type
-    else if (typeof module.querySamples === 'function') {
-      results = await module.querySamples({
-        sampleType: 'Workout',
-        startDate,
-        endDate,
+        from: startDate,
+        to: endDate,
       });
     }
 
@@ -526,4 +549,69 @@ export let fakeMode = false;
 export function setFakeMode(enabled: boolean) {
   fakeMode = enabled;
   console.log(`🎭 Fake health data mode: ${enabled ? 'ON' : 'OFF'}`);
+}
+
+/**
+ * Alias for getDailyMetrics (used by health store)
+ */
+export async function getDailyHealthData(date: Date = new Date()): Promise<DailyHealthData> {
+  return getDailyMetrics(date);
+}
+
+/**
+ * Get health data for the current week (Monday to today)
+ */
+export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  // Calculate Monday of this week (0 = Sunday, so Monday = 1)
+  const monday = new Date(today);
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  monday.setDate(today.getDate() - daysFromMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const weekData: DailyHealthData[] = [];
+
+  // Fetch data for each day from Monday to today
+  for (let i = 0; i <= daysFromMonday; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+
+    try {
+      const dayData = await getDailyMetrics(date);
+      weekData.push(dayData);
+    } catch (error) {
+      console.error(`❌ Error getting data for ${date.toISOString().split('T')[0]}:`, error);
+      // Push empty data for this day
+      weekData.push({
+        date: date.toISOString().split('T')[0],
+        steps: 0,
+        sleepHours: 0,
+        calories: 0,
+        distance: 0,
+        workouts: 0,
+      });
+    }
+  }
+
+  return weekData;
+}
+
+/**
+ * Get health diagnostics for crash reporting
+ */
+export function getHealthDiagnostics(): {
+  moduleLoaded: boolean;
+  deviceSupported: boolean;
+  isExpoGo: boolean;
+  loadError: string | null;
+} {
+  const module = getHealthKit();
+
+  return {
+    moduleLoaded: module !== null,
+    deviceSupported: Platform.OS === 'ios',
+    isExpoGo: isExpoGo,
+    loadError: loadError?.message || null,
+  };
 }

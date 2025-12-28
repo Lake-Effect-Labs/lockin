@@ -92,30 +92,41 @@ export async function runCrashDiagnostics(): Promise<CrashDiagnostic[]> {
 
   // 4. Check native modules
   try {
-    let hasReactNativeHealth = false;
+    let hasKingstinctHealthKit = false;
+    let hasNitroModules = false;
     let hasGoogleMobileAds = false;
-    
+
     try {
-      require('react-native-health');
-      hasReactNativeHealth = true;
+      require('@kingstinct/react-native-healthkit');
+      hasKingstinctHealthKit = true;
     } catch {
-      hasReactNativeHealth = false;
+      hasKingstinctHealthKit = false;
     }
-    
+
+    try {
+      require('react-native-nitro-modules');
+      hasNitroModules = true;
+    } catch {
+      hasNitroModules = false;
+    }
+
     try {
       require('react-native-google-mobile-ads');
       hasGoogleMobileAds = true;
     } catch {
       hasGoogleMobileAds = false;
     }
-    
+
     diagnostics.push({
       category: 'Native Modules',
       check: 'Module Loading',
-      status: 'safe',
-      message: 'Native modules check passed',
+      status: hasKingstinctHealthKit && hasNitroModules ? 'safe' : 'warning',
+      message: hasKingstinctHealthKit && hasNitroModules
+        ? 'Native modules check passed'
+        : 'Some native modules not loaded (may be expected in Expo Go)',
       details: {
-        reactNativeHealth: hasReactNativeHealth,
+        kingstinctHealthKit: hasKingstinctHealthKit,
+        nitroModules: hasNitroModules,
         googleMobileAds: hasGoogleMobileAds,
       },
     });
