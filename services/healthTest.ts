@@ -244,11 +244,14 @@ export function getHealthDiagnostics(): {
       platform,
       isHealthAvailable: isHealthAvailable(),
       requiredPackages: [
-        { name: 'react-native-health', required: true },
+        { name: '@kingstinct/react-native-healthkit', required: true },
+        { name: 'react-native-nitro-modules', required: true },
       ],
       requiredPermissions: [
         'NSHealthShareUsageDescription (Info.plist)',
+        'NSHealthUpdateUsageDescription (Info.plist)',
         'com.apple.developer.healthkit (entitlement)',
+        'com.apple.developer.healthkit.background-delivery (entitlement)',
       ],
     };
   }
