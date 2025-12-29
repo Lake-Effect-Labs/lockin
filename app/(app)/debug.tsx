@@ -43,6 +43,7 @@ import {
 } from '@/services/weeklySimulation';
 // Background sync removed - now using on-app-open sync
 import { simulateLeadChangeNotification } from '@/services/matchupMonitor';
+import { runLeagueSpeedRun, SpeedRunStep } from '@/services/leagueSpeedRun';
 import { useHealthStore } from '@/store/useHealthStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
@@ -54,7 +55,7 @@ import { useLeagueStore } from '@/store/useLeagueStore';
 
 export default function DebugScreen() {
   const { user } = useAuthStore();
-  const { currentDashboard } = useLeagueStore();
+  const { currentDashboard, fetchDashboard } = useLeagueStore();
   const [testResults, setTestResults] = useState<E2ETestResults | null>(null);
   const [healthResults, setHealthResults] = useState<HealthTestSuite | null>(null);
   const [regressionResults, setRegressionResults] = useState<RegressionTestResults | null>(null);
@@ -63,6 +64,11 @@ export default function DebugScreen() {
   const [isRunningHealth, setIsRunningHealth] = useState(false);
   const [isRunningRegression, setIsRunningRegression] = useState(false);
   const [isRunningIntegration, setIsRunningIntegration] = useState(false);
+  const [isRunningSpeedRun, setIsRunningSpeedRun] = useState(false);
+  const [speedRunProgress, setSpeedRunProgress] = useState<SpeedRunStep[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationSteps, setSimulationSteps] = useState<SimulationStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const { fakeMode, setFakeMode } = useHealthStore();
   
   const runTests = () => {
@@ -407,7 +413,65 @@ export default function DebugScreen() {
     await simulateLeadChangeNotification('close_matchup', 'John Doe', 25);
     Alert.alert('Sent!', 'Check your notifications');
   };
-  
+
+  const runSpeedRunTest = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to run speed run test');
+      return;
+    }
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        '🏎️ League Speed Run',
+        'This will create a real test league in the database with 12 players and simulate 8 weeks + playoffs.\n\nThe league will be preserved so you can inspect it afterwards.\n\nContinue?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Start Speed Run', style: 'default', onPress: () => resolve(true) }
+        ]
+      );
+    });
+
+    if (!confirmed) return;
+
+    setIsRunningSpeedRun(true);
+    setSpeedRunProgress([]);
+
+    try {
+      const result = await runLeagueSpeedRun(user.id, {
+        playerCount: 12,
+        seasonWeeks: 8,
+        onProgress: (step) => {
+          setSpeedRunProgress(prev => [...prev, step]);
+        },
+      });
+
+      if (result.success) {
+        Alert.alert(
+          '🏆 Speed Run Complete!',
+          `Champion: ${result.champion}\n` +
+          `Total Time: ${(result.totalTimeMs / 1000).toFixed(1)}s\n` +
+          `Steps: ${result.steps.length}\n\n` +
+          `League ID: ${result.leagueId?.substring(0, 8)}...\n\n` +
+          `Check your leagues to see the completed test league!`,
+          [{ text: 'Awesome!', style: 'default' }]
+        );
+      } else {
+        const errorStep = result.steps.find(s => !s.success);
+        Alert.alert(
+          '❌ Speed Run Failed',
+          `Failed at: ${errorStep?.title || 'Unknown step'}\n` +
+          `Error: ${errorStep?.description || 'Unknown error'}\n` +
+          `Completed: ${result.steps.filter(s => s.success).length}/${result.steps.length} steps`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('❌ Speed Run Error', error.message);
+    } finally {
+      setIsRunningSpeedRun(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -659,6 +723,10 @@ export default function DebugScreen() {
                     `Workouts: ${d.todayData.workouts}`;
                 }
 
+                const rawInfo = d.rawSampleInfo
+                  ? `\n\n🔬 RAW SAMPLE DATA:\n${d.rawSampleInfo}`
+                  : '';
+
                 const errorsText = d.errors.length > 0
                   ? `\n\n❌ ERRORS:\n${d.errors.join('\n')}`
                   : '';
@@ -670,6 +738,7 @@ export default function DebugScreen() {
                   `AUTH: ${d.authStatus}\n` +
                   `DATA: ${d.dataStatus}\n\n` +
                   `TODAY'S VALUES:\n${dataText}` +
+                  rawInfo +
                   errorsText
                 );
               } catch (error: any) {
@@ -906,7 +975,37 @@ export default function DebugScreen() {
             <Ionicons name="play" size={20} color={colors.primary[500]} />
             <Text style={styles.secondaryText}>Run Season Simulation</Text>
           </TouchableOpacity>
-          
+
+          <TouchableOpacity
+            onPress={runSpeedRunTest}
+            disabled={isRunningSpeedRun}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={isRunningSpeedRun ? ['#666', '#555'] : ['#F59E0B', '#D97706']}
+              style={styles.actionButton}
+            >
+              <Ionicons name="rocket" size={20} color={colors.text.primary} />
+              <Text style={styles.actionText}>
+                {isRunningSpeedRun ? `Speed Running... (${speedRunProgress.length} steps)` : '🏎️ League Speed Run (E2E)'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {speedRunProgress.length > 0 && (
+            <View style={styles.speedRunProgress}>
+              <Text style={styles.speedRunTitle}>Speed Run Progress:</Text>
+              {speedRunProgress.slice(-5).map((step, i) => (
+                <Text key={i} style={[
+                  styles.speedRunStep,
+                  { color: step.success ? colors.status.success : colors.status.error }
+                ]}>
+                  {step.success ? '✓' : '✗'} {step.title}
+                </Text>
+              ))}
+            </View>
+          )}
+
           <TouchableOpacity
             onPress={() => setFakeMode(!fakeMode)}
             style={styles.secondaryButton}
@@ -1269,6 +1368,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text.secondary,
     marginLeft: 8,
+  },
+  speedRunProgress: {
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  speedRunTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  speedRunStep: {
+    fontSize: 11,
+    marginBottom: 4,
   },
   useCaseCard: {
     backgroundColor: colors.background.card,
