@@ -598,15 +598,16 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
 export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHealthData> {
   console.log('📊 Getting daily metrics for', date.toLocaleDateString());
 
-  const [steps, sleep, calories, standHours, workouts] = await Promise.all([
+  const [steps, sleep, calories, standHours, workouts, distance] = await Promise.all([
     getDailySteps(date),
     getDailySleep(date),
     getDailyCalories(date),
     getDailyStandHours(date),
     getDailyWorkouts(date),
+    getDailyDistance(date),
   ]);
 
-  console.log('📊 Results:', { steps, sleep, calories, standHours, workouts });
+  console.log('📊 Results:', { steps, sleep, calories, standHours, workouts, distance });
 
   return {
     date: date.toISOString().split('T')[0],
@@ -615,6 +616,7 @@ export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHea
     calories,
     standHours,
     workouts,
+    distance,
   };
 }
 

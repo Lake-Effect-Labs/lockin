@@ -10,6 +10,7 @@ export const DEFAULT_SCORING_CONFIG = {
   POINTS_PER_100_ACTIVE_CAL: 5,
   POINTS_PER_WORKOUT_MINUTE: 0.2, // 1 point per 5 minutes of exercise
   POINTS_PER_STAND_HOUR: 5, // 5 points per hour stood
+  POINTS_PER_MILE: 3,
 } as const;
 
 // Legacy export for backwards compatibility
@@ -22,6 +23,7 @@ export interface ScoringConfig {
   points_per_100_active_cal?: number;
   points_per_workout?: number;
   points_per_stand_hour?: number;
+  points_per_mile?: number;
 }
 
 /**
@@ -36,6 +38,7 @@ export function getScoringConfig(leagueConfig?: ScoringConfig | null): typeof DE
     POINTS_PER_100_ACTIVE_CAL: (leagueConfig.points_per_100_active_cal ?? DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL) as 5,
     POINTS_PER_WORKOUT_MINUTE: (leagueConfig.points_per_workout ?? DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE) as 0.2,
     POINTS_PER_STAND_HOUR: (leagueConfig.points_per_stand_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_STAND_HOUR) as 5,
+    POINTS_PER_MILE: (leagueConfig.points_per_mile ?? DEFAULT_SCORING_CONFIG.POINTS_PER_MILE) as 3,
   };
 }
 
@@ -45,6 +48,7 @@ export interface FitnessMetrics {
   calories: number;
   workouts: number; // in minutes
   standHours: number; // hours stood up
+  distance: number; // in miles
 }
 
 export interface PointsBreakdown {
@@ -53,6 +57,7 @@ export interface PointsBreakdown {
   caloriesPoints: number;
   workoutsPoints: number;
   standHoursPoints: number;
+  distancePoints: number;
   totalPoints: number;
 }
 
@@ -70,6 +75,7 @@ const SANITIZATION_CAPS = {
   MAX_CALORIES: 10000, // ~5x average daily burn
   MAX_WORKOUT_MINUTES: 1440, // can't exercise more than 24 hours/day (1440 minutes)
   MAX_STAND_HOURS: 16, // can't stand more than 16 hours/day (need sleep)
+  MAX_DISTANCE: 150, // ~ultra-marathon distance
 } as const;
 
 /**
@@ -96,6 +102,7 @@ export function sanitizeMetrics(metrics: FitnessMetrics): FitnessMetrics {
     calories: sanitize(metrics.calories, SANITIZATION_CAPS.MAX_CALORIES),
     workouts: sanitize(metrics.workouts, SANITIZATION_CAPS.MAX_WORKOUT_MINUTES),
     standHours: sanitize(metrics.standHours, SANITIZATION_CAPS.MAX_STAND_HOURS),
+    distance: sanitize(metrics.distance, SANITIZATION_CAPS.MAX_DISTANCE),
   };
 }
 
@@ -116,8 +123,9 @@ export function calculatePoints(metrics: FitnessMetrics, config?: typeof DEFAULT
   const caloriesPoints = (safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL;
   const workoutsPoints = safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE;
   const standHoursPoints = safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR;
+  const distancePoints = safe.distance * scoringConfig.POINTS_PER_MILE;
   
-  return Math.round((stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints) * 100) / 100;
+  return Math.round((stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints + distancePoints) * 100) / 100;
 }
 
 /**
@@ -137,6 +145,7 @@ export function getPointsBreakdown(metrics: FitnessMetrics, config?: typeof DEFA
   const caloriesPoints = Math.round((safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL * 100) / 100;
   const workoutsPoints = Math.round(safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE * 100) / 100;
   const standHoursPoints = Math.round(safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR * 100) / 100;
+  const distancePoints = Math.round(safe.distance * scoringConfig.POINTS_PER_MILE * 100) / 100;
   
   return {
     stepsPoints,
@@ -144,7 +153,8 @@ export function getPointsBreakdown(metrics: FitnessMetrics, config?: typeof DEFA
     caloriesPoints,
     workoutsPoints,
     standHoursPoints,
-    totalPoints: stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints,
+    distancePoints,
+    totalPoints: stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints + distancePoints,
   };
 }
 
@@ -251,7 +261,7 @@ export function getScoringRules(config?: typeof DEFAULT_SCORING_CONFIG): { metri
  */
 export function aggregateWeeklyMetrics(dailyMetrics: FitnessMetrics[]): FitnessMetrics {
   if (!dailyMetrics || dailyMetrics.length === 0) {
-    return { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0 };
+    return { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 };
   }
   
   return dailyMetrics.reduce(
@@ -261,8 +271,9 @@ export function aggregateWeeklyMetrics(dailyMetrics: FitnessMetrics[]): FitnessM
       calories: acc.calories + (Number(day?.calories) || 0),
       workouts: acc.workouts + (Number(day?.workouts) || 0),
       standHours: acc.standHours + (Number(day?.standHours) || 0),
+      distance: acc.distance + (Number(day?.distance) || 0),
     }),
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0 }
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 }
   );
 }
 

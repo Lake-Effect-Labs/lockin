@@ -91,6 +91,7 @@ export default function HomeScreen() {
     { icon: '🔥', value: todayData.calories.toLocaleString(), label: 'Calories', color: '#E74C3C' },
     { icon: '💪', value: `${todayData.workouts}m`, label: 'Workout Mins', color: colors.accent[500] },
     { icon: '🧑‍💼', value: `${todayData.standHours}h`, label: 'Stand Hours', color: '#9B59B6' },
+    { icon: '🏃', value: `${todayData.distance.toFixed(1)}`, label: 'Miles', color: '#3498DB' },
   ] : [];
   
   return (
@@ -188,7 +189,7 @@ export default function HomeScreen() {
           </View>
           {lastSyncedAt ? (
             <View style={styles.statsCard}>
-              <StatsGrid stats={stats} columns={2} />
+              <StatsGrid stats={stats} columns={3} />
               <Text style={styles.syncTime}>
                 Updated {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
