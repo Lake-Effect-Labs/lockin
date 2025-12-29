@@ -54,6 +54,14 @@ function loadAdMobModule(): boolean {
 }
 
 /**
+ * Check if AdMob is available in this environment
+ */
+function isAdMobAvailable(): boolean {
+  loadAdMobModule();
+  return !!BannerAd && !!BannerAdSize && !!TestIds;
+}
+
+/**
  * Validate AdMob components are safe to use
  * Returns true if all required components are available and valid
  */

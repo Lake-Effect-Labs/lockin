@@ -23,8 +23,9 @@ import {
   updatePlayoffScores,
   finalizePlayoffMatch,
 } from './supabase';
-import { calculatePoints, FitnessMetrics } from './scoring';
+import { calculatePoints, FitnessMetrics, sanitizeMetrics } from './scoring';
 import { getPlayoffQualifiers, shouldStartPlayoffs, buildPlayoffBracket, PlayoffBracket } from './playoffs';
+import { isValidLeagueSize, validateLeagueCanStart, isLeagueFull } from './validation';
 
 // ============================================
 // LEAGUE SERVICE
@@ -57,6 +58,7 @@ export interface LeagueDashboard {
 
 /**
  * Create a new league
+ * @throws Error if league size is invalid
  */
 export async function createNewLeague(
   name: string,
@@ -71,6 +73,11 @@ export async function createNewLeague(
     points_per_mile?: number;
   } | null
 ): Promise<League> {
+  // Validate league size
+  if (!isValidLeagueSize(maxPlayers)) {
+    throw new Error(`Invalid league size: ${maxPlayers}. Allowed sizes: 4, 6, 8, 10, 12, 14`);
+  }
+  
   const league = await createLeagueDB(name, seasonLength, userId, maxPlayers, scoringConfig);
   return league;
 }
