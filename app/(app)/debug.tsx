@@ -420,7 +420,7 @@ export default function DebugScreen() {
     const confirmed = await new Promise<boolean>((resolve) => {
       Alert.alert(
         '🏎️ League Speed Run',
-        'This will create a real test league in the database with 4 players and simulate 4 weeks + playoffs.\n\nThe league will be preserved so you can inspect it afterwards.\n\nContinue?',
+        'This will create a real test league in the database with 12 players and simulate 8 weeks + playoffs.\n\nThe league will be preserved so you can inspect it afterwards.\n\nContinue?',
         [
           { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
           { text: 'Start Speed Run', style: 'default', onPress: () => resolve(true) }
@@ -435,8 +435,8 @@ export default function DebugScreen() {
 
     try {
       const result = await runLeagueSpeedRun(user.id, {
-        playerCount: 4,
-        seasonWeeks: 4,
+        playerCount: 12,
+        seasonWeeks: 8,
         onProgress: (step) => {
           setSpeedRunProgress(prev => [...prev, step]);
         },

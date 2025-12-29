@@ -27,10 +27,11 @@ export interface SpeedRunResult {
   totalTimeMs: number;
 }
 
-// Fake user names for bots
+// Fake user names for bots (11 bots + 1 real user = 12 players max)
 const BOT_NAMES = [
   'FitBot Alpha', 'FitBot Beta', 'FitBot Gamma', 'FitBot Delta',
   'FitBot Epsilon', 'FitBot Zeta', 'FitBot Eta', 'FitBot Theta',
+  'FitBot Iota', 'FitBot Kappa', 'FitBot Lambda',
 ];
 
 // ============================================
@@ -49,7 +50,7 @@ export async function runLeagueSpeedRun(
     onProgress?: (step: SpeedRunStep) => void;
   } = {}
 ): Promise<SpeedRunResult> {
-  const { playerCount = 4, seasonWeeks = 4, onProgress } = options;
+  const { playerCount = 12, seasonWeeks = 8, onProgress } = options;
   const startTime = Date.now();
   const steps: SpeedRunStep[] = [];
   let leagueId: string | null = null;
