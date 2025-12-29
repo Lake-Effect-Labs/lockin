@@ -571,6 +571,44 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
 }
 
 /**
+ * Get health data for a specific date range
+ * Used by league sync to get data for the league's week (not calendar week)
+ */
+export async function getHealthDataRange(startDate: Date, endDate: Date): Promise<DailyHealthData[]> {
+  const result: DailyHealthData[] = [];
+
+  // Normalize dates
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  // Get data for each day in the range
+  const current = new Date(start);
+  while (current <= end) {
+    try {
+      const dayData = await getDailyMetrics(new Date(current));
+      result.push(dayData);
+    } catch (error) {
+      console.error(`Error getting data for ${current.toISOString().split('T')[0]}:`, error);
+      // Push empty data for this day
+      result.push({
+        date: current.toISOString().split('T')[0],
+        steps: 0,
+        sleepHours: 0,
+        calories: 0,
+        distance: 0,
+        workouts: 0,
+      });
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return result;
+}
+
+/**
  * Get health diagnostics for crash reporting and in-app display
  */
 export function getHealthDiagnostics(): {
