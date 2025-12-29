@@ -249,6 +249,11 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
+    console.log('📊 [Steps] Query:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
     // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
@@ -258,18 +263,30 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
         { startDate, endDate }
       );
 
+      console.log('📊 [Steps] Raw response:', {
+        isArray: Array.isArray(samples),
+        length: samples?.length,
+        firstSample: samples?.[0] ? JSON.stringify(samples[0]) : 'none',
+        sampleKeys: samples?.[0] ? Object.keys(samples[0]) : [],
+      });
+
       // Sum all step samples for the day
       if (samples && Array.isArray(samples)) {
         const total = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || 0);
+          // Try multiple property names - different versions might use different names
+          const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
+          return sum + value;
         }, 0);
+        console.log('📊 [Steps] Total calculated:', total);
         return Math.round(total);
       }
+    } else {
+      console.log('⚠️ [Steps] queryQuantitySamples not available');
     }
 
     return 0;
   } catch (err: any) {
-    console.error('❌ Error getting steps:', err);
+    console.error('❌ Error getting steps:', err?.message, err);
     return 0;
   }
 }
@@ -656,6 +673,7 @@ export async function getHealthDiagnosticReport(): Promise<{
       distance: number;
       workouts: number;
     } | null;
+    rawSampleInfo: string | null;
     errors: string[];
   };
 }> {
@@ -664,6 +682,7 @@ export async function getHealthDiagnosticReport(): Promise<{
   let authStatus = '❌ Not requested';
   let dataStatus = '❌ No data';
   let todayData = null;
+  let rawSampleInfo: string | null = null;
 
   // Check module
   const module = getHealthKit();
@@ -672,7 +691,7 @@ export async function getHealthDiagnosticReport(): Promise<{
     return {
       status: 'not_working',
       message: 'HealthKit module not loaded. Rebuild with --clear-cache.',
-      details: { moduleStatus, authStatus, dataStatus, todayData, errors },
+      details: { moduleStatus, authStatus, dataStatus, todayData, rawSampleInfo, errors },
     };
   }
   moduleStatus = '✅ Loaded';
@@ -689,6 +708,32 @@ export async function getHealthDiagnosticReport(): Promise<{
   }
 
   authStatus = hasAuthMethod ? '✅ Available' : '❌ Missing';
+
+  // Try to get raw sample data to debug structure
+  if (hasQueryMethod) {
+    try {
+      const now = new Date();
+      const startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+
+      const rawSamples = await module.queryQuantitySamples(
+        'HKQuantityTypeIdentifierStepCount',
+        { startDate, endDate }
+      );
+
+      if (rawSamples && rawSamples.length > 0) {
+        const firstSample = rawSamples[0];
+        const keys = Object.keys(firstSample);
+        rawSampleInfo = `Found ${rawSamples.length} samples. Keys: [${keys.join(', ')}]. First: ${JSON.stringify(firstSample).substring(0, 200)}`;
+      } else {
+        rawSampleInfo = `Query returned ${rawSamples?.length || 0} samples (empty array or null)`;
+      }
+    } catch (err: any) {
+      rawSampleInfo = `Raw query error: ${err.message}`;
+    }
+  }
 
   // Try to get today's data
   try {
@@ -716,6 +761,6 @@ export async function getHealthDiagnosticReport(): Promise<{
   return {
     status,
     message,
-    details: { moduleStatus, authStatus, dataStatus, todayData, errors },
+    details: { moduleStatus, authStatus, dataStatus, todayData, rawSampleInfo, errors },
   };
 }

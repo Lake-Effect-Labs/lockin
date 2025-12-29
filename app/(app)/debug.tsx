@@ -55,7 +55,7 @@ import { useLeagueStore } from '@/store/useLeagueStore';
 
 export default function DebugScreen() {
   const { user } = useAuthStore();
-  const { currentDashboard } = useLeagueStore();
+  const { currentDashboard, fetchDashboard } = useLeagueStore();
   const [testResults, setTestResults] = useState<E2ETestResults | null>(null);
   const [healthResults, setHealthResults] = useState<HealthTestSuite | null>(null);
   const [regressionResults, setRegressionResults] = useState<RegressionTestResults | null>(null);
@@ -66,6 +66,9 @@ export default function DebugScreen() {
   const [isRunningIntegration, setIsRunningIntegration] = useState(false);
   const [isRunningSpeedRun, setIsRunningSpeedRun] = useState(false);
   const [speedRunProgress, setSpeedRunProgress] = useState<SpeedRunStep[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationSteps, setSimulationSteps] = useState<SimulationStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const { fakeMode, setFakeMode } = useHealthStore();
   
   const runTests = () => {
@@ -720,6 +723,10 @@ export default function DebugScreen() {
                     `Workouts: ${d.todayData.workouts}`;
                 }
 
+                const rawInfo = d.rawSampleInfo
+                  ? `\n\n🔬 RAW SAMPLE DATA:\n${d.rawSampleInfo}`
+                  : '';
+
                 const errorsText = d.errors.length > 0
                   ? `\n\n❌ ERRORS:\n${d.errors.join('\n')}`
                   : '';
@@ -731,6 +738,7 @@ export default function DebugScreen() {
                   `AUTH: ${d.authStatus}\n` +
                   `DATA: ${d.dataStatus}\n\n` +
                   `TODAY'S VALUES:\n${dataText}` +
+                  rawInfo +
                   errorsText
                 );
               } catch (error: any) {
