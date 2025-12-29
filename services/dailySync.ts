@@ -208,11 +208,14 @@ export async function getWeeklySyncStatus(): Promise<WeeklySyncStatus> {
 // ============================================
 
 function getWeekStart(): Date {
+  // Get Monday as start of week (consistent with league weeks)
   const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day;
+  const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  // If Sunday (0), go back 6 days to get Monday
+  // Otherwise, go back (day - 1) days to get Monday
+  const daysToSubtract = day === 0 ? 6 : day - 1;
   const weekStart = new Date(now);
-  weekStart.setDate(diff);
+  weekStart.setDate(now.getDate() - daysToSubtract);
   weekStart.setHours(0, 0, 0, 0);
   return weekStart;
 }
