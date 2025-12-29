@@ -32,6 +32,9 @@ import { isValidLeagueSize, validateLeagueCanStart, isLeagueFull } from './valid
 // High-level league management functions
 // ============================================
 
+// Lock map to prevent race conditions on week advancement
+const leagueWeekLocks = new Map<string, Promise<void>>();
+
 export interface LeagueWithDetails extends League {
   members: LeagueMember[];
   memberCount: number;
@@ -79,23 +82,47 @@ export async function validateLeagueStart(leagueId: string, league: League): Pro
 }
 
 /**
- * Start a league season (validates it's full first)
- * @throws Error if league is not full
+ * Join a league by code (with validation for full leagues)
+ * @throws Error if league is full, already started, or invalid code
  */
-export async function startLeague(leagueId: string, league: League): Promise<void> {
-  // Get current members
-  const members = await getLeagueMembers(leagueId);
+export async function joinLeague(joinCode: string, userId: string): Promise<LeagueMember> {
+  // First, get the league by join code to validate it
+  const { supabase } = await import('./supabase');
+  const { data: leagueData, error: leagueError } = await supabase
+    .from('leagues')
+    .select('*')
+    .eq('join_code', joinCode)
+    .single();
   
-  // Check if league is full
-  if (members.length < league.max_players) {
-    throw new Error(
-      `League must be full to start (${members.length}/${league.max_players} players). ` +
-      `Invite ${league.max_players - members.length} more player(s).`
-    );
+  if (leagueError || !leagueData) {
+    throw new Error('Invalid join code');
   }
   
-  // League is full, start the season
-  await startLeagueSeason(leagueId);
+  const league = leagueData as League;
+  
+  // Check if league has already started
+  if (league.start_date) {
+    const startDate = new Date(league.start_date);
+    const now = new Date();
+    if (startDate <= now) {
+      throw new Error('Cannot join a league that has already started');
+    }
+  }
+  
+  // Check if league is full
+  const members = await getLeagueMembers(league.id);
+  if (members.length >= league.max_players) {
+    throw new Error('This league is full. Cannot join.');
+  }
+  
+  // Check if user is already in the league
+  const existingMember = members.find(m => m.user_id === userId);
+  if (existingMember) {
+    throw new Error('You are already a member of this league');
+  }
+  
+  // All validations passed - join the league
+  return joinLeagueByCode(joinCode, userId);
 }
 
 /**
@@ -122,13 +149,6 @@ export async function createNewLeague(
   
   const league = await createLeagueDB(name, seasonLength, userId, maxPlayers, scoringConfig);
   return league;
-}
-
-/**
- * Join a league by code
- */
-export async function joinLeague(joinCode: string, userId: string): Promise<LeagueMember> {
-  return joinLeagueByCode(joinCode, userId);
 }
 
 /**
@@ -185,63 +205,79 @@ export async function getLeagueDashboard(
   if (!league) throw new Error('League not found');
   
   // Auto-advance week if calendar week has advanced beyond current_week
+  // Use a lock to prevent race conditions when multiple users load the dashboard simultaneously
   if (league.start_date && league.current_week < league.season_length_weeks) {
     const { getWeekNumber } = await import('../utils/dates');
     const actualWeek = getWeekNumber(league.start_date);
     
     if (actualWeek > league.current_week) {
-      // League auto-advanced to new week
+      // Acquire lock for this league to prevent concurrent week advancement
+      const lockKey = `week-advance-${leagueId}`;
+      let lockPromise = leagueWeekLocks.get(lockKey);
       
-      // Finalize any incomplete weeks between current_week and actualWeek
-      const { finalizeWeek, startLeagueSeason } = await import('./supabase');
-      for (let week = league.current_week; week < actualWeek; week++) {
-        try {
-          await finalizeWeek(leagueId, week);
-          // Week finalized successfully
-        } catch (error: any) {
-          // Error finalizing week
-        }
-      }
-      
-      // Generate matchups for any missing weeks
-      // The generate_matchups function generates for the current week if matchups don't exist
-      // So we call it after each week finalization to generate the next week's matchups
-      for (let week = league.current_week + 1; week <= actualWeek; week++) {
-        const weekMatchups = allMatchups.filter(m => m.week_number === week);
-        if (weekMatchups.length === 0 && week <= league.season_length_weeks) {
-          // Generating matchups for new week
+      if (!lockPromise) {
+        // Create new lock promise
+        lockPromise = (async () => {
           try {
-            // The generate_matchups function checks current_week and generates matchups for it
-            // So we need to update current_week first, then generate
-            const { supabase } = await import('./supabase');
-            const { error: updateError } = await supabase
+            // League auto-advanced to new week
+            
+            // Finalize any incomplete weeks between current_week and actualWeek
+            const { finalizeWeek, startLeagueSeason } = await import('./supabase');
+            for (let week = league.current_week; week < actualWeek; week++) {
+              try {
+                await finalizeWeek(leagueId, week);
+                // Week finalized successfully
+              } catch (error: any) {
+                // Error finalizing week
+              }
+            }
+            
+            // Generate matchups for any missing weeks
+            for (let week = league.current_week + 1; week <= actualWeek; week++) {
+              const weekMatchups = allMatchups.filter(m => m.week_number === week);
+              if (weekMatchups.length === 0 && week <= league.season_length_weeks) {
+                // Generating matchups for new week
+                try {
+                  const { supabase } = await import('./supabase') as any;
+                  const { error: updateError } = await supabase
+                    .from('leagues')
+                    .update({ current_week: week })
+                    .eq('id', leagueId);
+                  
+                  if (updateError) throw updateError;
+                  
+                  // Generate matchups (will generate for current_week, which we just set)
+                  await startLeagueSeason(leagueId);
+                  
+                  // Refresh matchups after generation
+                  allMatchups = await getMatchups(leagueId);
+                } catch (error: any) {
+                  // Error generating matchups
+                }
+              }
+            }
+            
+            // Ensure current_week is set to actualWeek after all processing
+            const { supabase: sb } = await import('./supabase') as any;
+            await sb
               .from('leagues')
-              .update({ current_week: week })
+              .update({ current_week: actualWeek })
               .eq('id', leagueId);
             
-            if (updateError) throw updateError;
-            
-            // Generate matchups (will generate for current_week, which we just set)
-            await startLeagueSeason(leagueId);
-            
-            // Refresh matchups after generation
-            allMatchups = await getMatchups(leagueId);
-          } catch (error: any) {
-            // Error generating matchups
+            // Refresh league to get updated current_week
+            league = await getLeague(leagueId);
+            if (!league) throw new Error('League not found after update');
+          } finally {
+            // Release lock
+            leagueWeekLocks.delete(lockKey);
           }
-        }
+        })();
+        
+        leagueWeekLocks.set(lockKey, lockPromise);
       }
       
-      // Ensure current_week is set to actualWeek after all processing
-      const { supabase } = await import('./supabase');
-      await supabase
-        .from('leagues')
-        .update({ current_week: actualWeek })
-        .eq('id', leagueId);
-      
-      // Refresh league to get updated current_week
-      league = await getLeague(leagueId);
-      if (!league) throw new Error('League not found after update');
+      // Wait for lock to complete
+      await lockPromise;
     }
   }
   
@@ -254,34 +290,6 @@ export async function getLeagueDashboard(
     (m.player1_id === userId || m.player2_id === userId)
   ) || null;
   
-  // If demo league (opponent is same as user), generate fake opponent
-  if (currentMatchup && currentMatchup.player1_id === currentMatchup.player2_id) {
-    const fakeOpponentNames = [
-      'Alex Runner', 'Jordan Fit', 'Sam Active', 'Taylor Swift', 
-      'Casey Strong', 'Morgan Pace', 'Riley Endurance', 'Quinn Power'
-    ];
-    const opponentIndex = currentWeek % fakeOpponentNames.length;
-    const fakeOpponent: User = {
-      id: `fake-opponent-${currentWeek}`,
-      email: `opponent${currentWeek}@demo.com`,
-      username: fakeOpponentNames[opponentIndex],
-      avatar_url: null,
-      push_token: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    // Replace opponent with fake user
-    const isPlayer1 = currentMatchup.player1_id === userId;
-    currentMatchup = {
-      ...currentMatchup,
-      player2_id: isPlayer1 ? fakeOpponent.id : currentMatchup.player2_id,
-      player1_id: !isPlayer1 ? fakeOpponent.id : currentMatchup.player1_id,
-      player2: isPlayer1 ? fakeOpponent : currentMatchup.player2,
-      player1: !isPlayer1 ? fakeOpponent : currentMatchup.player1,
-    };
-  }
-  
   // Get weekly scores
   let userScore: WeeklyScore | null = null;
   let opponentScore: WeeklyScore | null = null;
@@ -293,32 +301,10 @@ export async function getLeagueDashboard(
         ? currentMatchup.player2_id 
         : currentMatchup.player1_id;
       
-      // Only fetch real scores if opponent is not fake
-      const isFakeOpponent = opponentId.startsWith('fake-opponent-') || opponentId.startsWith('fake-member-');
-      
       [userScore, opponentScore] = await Promise.all([
         getWeeklyScore(leagueId, userId, currentWeek).catch(() => null),
-        isFakeOpponent ? Promise.resolve(null) : getWeeklyScore(leagueId, opponentId, currentWeek).catch(() => null),
+        getWeeklyScore(leagueId, opponentId, currentWeek).catch(() => null),
       ]);
-      
-      // Generate fake opponent score if needed
-      if (isFakeOpponent && !opponentScore && currentMatchup) {
-        const fakeScore = isPlayer1 ? (currentMatchup.player2_score || 0) : (currentMatchup.player1_score || 0);
-        opponentScore = {
-          id: `fake-score-${currentWeek}`,
-          league_id: leagueId,
-          user_id: opponentId,
-          week_number: currentWeek,
-          steps: Math.floor(fakeScore * 100),
-          sleep_hours: Math.floor(fakeScore / 20),
-          calories: Math.floor(fakeScore * 50),
-          workouts: Math.floor(fakeScore / 20),
-          distance: Math.floor(fakeScore / 10),
-          total_points: fakeScore || 0,
-          last_synced_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-        };
-      }
     } catch (error) {
       // Error fetching weekly scores
       // Continue with null scores - UI will handle gracefully
@@ -355,44 +341,8 @@ export async function getLeagueDashboard(
   // Build playoff bracket if in playoffs
   const playoffBracket = isPlayoffs ? buildPlayoffBracket(playoffs, members) : null;
   
-  // If demo league (only one real member), generate fake members for standings
-  let displayMembers = [...members];
-  if (members.length === 1 && league.name?.includes('Demo')) {
-    const fakeOpponentNames = [
-      'Alex Runner', 'Jordan Fit', 'Sam Active', 'Casey Strong', 
-      'Morgan Pace', 'Riley Endurance', 'Quinn Power', 'Taylor Swift'
-    ];
-    const fakeMembers: LeagueMember[] = fakeOpponentNames.slice(0, 7).map((name, index) => {
-      const fakeUserId = `fake-member-${index + 1}`;
-      const fakeUser: User = {
-        id: fakeUserId,
-        email: `member${index + 1}@demo.com`,
-        username: name,
-        avatar_url: null,
-        push_token: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      return {
-        id: `fake-member-${index + 1}`,
-        league_id: leagueId,
-        user_id: fakeUserId,
-        wins: Math.floor(Math.random() * 3),
-        losses: Math.floor(Math.random() * 3),
-        ties: 0,
-        total_points: 200 + Math.random() * 300,
-        playoff_seed: null,
-        is_eliminated: false,
-        is_admin: false,
-        joined_at: new Date().toISOString(),
-        user: fakeUser,
-      };
-    });
-    displayMembers = [...members, ...fakeMembers];
-  }
-  
-  // Sort standings
-  const standings = displayMembers.sort((a, b) => {
+  // Sort standings (only real members, no fake demo members)
+  const standings = members.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.total_points - a.total_points;
   });
@@ -402,7 +352,7 @@ export async function getLeagueDashboard(
   
   return {
     league,
-    members: displayMembers,
+    members: standings,
     currentMatchup,
     userScore,
     opponentScore,
@@ -423,12 +373,19 @@ export async function syncUserScore(
   weekNumber: number,
   metrics: FitnessMetrics
 ): Promise<WeeklyScore> {
+  // Sanitize metrics before syncing
+  const sanitized = sanitizeMetrics(metrics);
+  
+  // Calculate points for the sanitized metrics
+  const points = calculatePoints(sanitized);
+  
+  // Upsert the weekly score with sanitized data
   return upsertWeeklyScore(leagueId, userId, weekNumber, {
-    steps: metrics.steps,
-    sleep_hours: metrics.sleepHours,
-    calories: metrics.calories,
-    workouts: metrics.workouts,
-    distance: metrics.distance,
+    steps: sanitized.steps,
+    sleep_hours: sanitized.sleepHours,
+    calories: sanitized.calories,
+    workouts: sanitized.workouts,
+    distance: sanitized.distance,
   });
 }
 

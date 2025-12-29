@@ -209,28 +209,20 @@ Join Code: ${joinCode}`;
   const handleStartLeague = async () => {
     if (!currentDashboard || !user) return;
     
-    Alert.alert(
-      'Start League',
-      'Are you sure you want to start the league? This will generate matchups for Week 1.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { startLeague } = await import('@/services/admin');
-              await startLeague(leagueId, user.id);
-              // Refresh dashboard
-              await fetchDashboard(leagueId, user.id);
-              Alert.alert('Success', 'League started! Matchups have been generated.');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to start league');
-            }
-          },
-        },
-      ]
-    );
+    const startDate = currentDashboard.league.start_date;
+    if (!startDate) {
+      Alert.alert(
+        'League Scheduled',
+        'This league is full and has been scheduled to start on the next Monday. Matchups will be generated automatically at that time.'
+      );
+    } else {
+      const startDateObj = new Date(startDate);
+      const formattedDate = startDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      Alert.alert(
+        'League Starts',
+        `Your league is scheduled to start on ${formattedDate}. Matchups will be generated automatically.`
+      );
+    }
   };
   
   const handleDeleteLeague = async () => {
@@ -596,9 +588,10 @@ Join Code: ${joinCode}`;
                 <TouchableOpacity
                   style={styles.adminButton}
                   onPress={handleStartLeague}
+                  disabled={true}
                 >
-                  <Ionicons name="play-circle" size={20} color={colors.primary[500]} />
-                  <Text style={styles.adminButtonText}>Start League</Text>
+                  <Ionicons name="calendar" size={20} color={colors.primary[500]} />
+                  <Text style={styles.adminButtonText}>Starts Next Monday</Text>
                 </TouchableOpacity>
               )}
               
