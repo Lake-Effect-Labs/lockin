@@ -495,27 +495,47 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
 export async function getDailyWorkouts(date: Date = new Date()): Promise<number> {
   const module = getHealthKit();
   if (!module) {
-    console.log('⚠️ HealthKit not available, returning 0 workouts');
+    console.log('⚠️ HealthKit not available, returning 0 workout minutes');
     return 0;
   }
 
   try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
-
     let results: any[] = [];
 
     // Query workouts using Kingstinct API
-    // API: queryWorkouts({ from, to })
+    // API: queryWorkouts({ limit }) - returns workout objects with duration
     if (typeof module.queryWorkouts === 'function') {
-      results = await module.queryWorkouts({ from, to });
+      results = await module.queryWorkouts({
+        limit: 100, // Get up to 100 workouts
+      });
     }
 
-    // Return the count of workouts
-    return results?.length || 0;
+    if (!results || results.length === 0) {
+      return 0;
+    }
+
+    // Filter for today's workouts and sum up duration in minutes
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const totalMinutes = results
+      .filter((workout: any) => {
+        const workoutDate = new Date(workout?.startDate || workout?.date || 0);
+        return workoutDate >= dayStart && workoutDate <= dayEnd;
+      })
+      .reduce((sum: number, workout: any) => {
+        // Get workout duration in minutes
+        const start = new Date(workout.startDate).getTime();
+        const end = new Date(workout.endDate).getTime();
+        const durationMs = end - start;
+        const durationMinutes = durationMs / (1000 * 60);
+        return sum + durationMinutes;
+      }, 0);
+
+    console.log('💪 [Workouts] Total minutes:', totalMinutes);
+    return Math.round(totalMinutes);
   } catch (err: any) {
     console.error('❌ Error getting workouts:', err);
     return 0;

@@ -89,7 +89,7 @@ export default function HomeScreen() {
     { icon: '👟', value: todayData.steps.toLocaleString(), label: 'Steps', color: colors.primary[500] },
     { icon: '😴', value: `${todayData.sleepHours.toFixed(1)}h`, label: 'Sleep', color: colors.secondary[500] },
     { icon: '🔥', value: todayData.calories.toLocaleString(), label: 'Calories', color: '#E74C3C' },
-    { icon: '💪', value: todayData.workouts.toString(), label: 'Workouts', color: colors.accent[500] },
+    { icon: '💪', value: `${todayData.workouts}m`, label: 'Workout Mins', color: colors.accent[500] },
     { icon: '🏃', value: `${todayData.distance.toFixed(1)}`, label: 'Miles', color: '#3498DB' },
     { icon: '⭐', value: calculatePoints(todayData).toFixed(0), label: 'Points', color: colors.sport.gold },
   ] : [];
