@@ -543,27 +543,77 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
 }
 
 /**
+ * Get stand hours for a date (how many hours user stood up)
+ * Stand hour = any hour with at least 1 minute of standing activity
+ */
+export async function getDailyStandHours(date: Date = new Date()): Promise<number> {
+  const module = getHealthKit();
+  if (!module) {
+    console.log('⚠️ HealthKit not available, returning 0 stand hours');
+    return 0;
+  }
+
+  try {
+    let results: any[] = [];
+
+    // Query stand hours using Kingstinct API
+    // API: queryCategorySamples for HKCategoryTypeIdentifierAppleStandHour
+    if (typeof module.queryCategorySamples === 'function') {
+      results = await module.queryCategorySamples(
+        'HKCategoryTypeIdentifierAppleStandHour',
+        {
+          limit: 100, // Get up to 100 stand hour samples
+        }
+      );
+    }
+
+    if (!results || results.length === 0) {
+      return 0;
+    }
+
+    // Filter for today's stand hours
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const standHours = results
+      .filter((sample: any) => {
+        const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+        return sampleDate >= dayStart && sampleDate <= dayEnd;
+      })
+      .length; // Each sample represents 1 stand hour
+
+    console.log('⏰ [Stand Hours] Total hours stood:', standHours);
+    return standHours;
+  } catch (err: any) {
+    console.error('❌ Error getting stand hours:', err);
+    return 0;
+  }
+}
+
+/**
  * Get all daily fitness metrics
  */
 export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHealthData> {
   console.log('📊 Getting daily metrics for', date.toLocaleDateString());
 
-  const [steps, sleep, calories, distance, workouts] = await Promise.all([
+  const [steps, sleep, calories, standHours, workouts] = await Promise.all([
     getDailySteps(date),
     getDailySleep(date),
     getDailyCalories(date),
-    getDailyDistance(date),
+    getDailyStandHours(date),
     getDailyWorkouts(date),
   ]);
 
-  console.log('📊 Results:', { steps, sleep, calories, distance, workouts });
+  console.log('📊 Results:', { steps, sleep, calories, standHours, workouts });
 
   return {
     date: date.toISOString().split('T')[0],
     steps,
     sleepHours: sleep,
     calories,
-    distance: distance,
+    standHours,
     workouts,
   };
 }

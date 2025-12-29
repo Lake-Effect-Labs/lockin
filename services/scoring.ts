@@ -9,7 +9,7 @@ export const DEFAULT_SCORING_CONFIG = {
   POINTS_PER_SLEEP_HOUR: 2,
   POINTS_PER_100_ACTIVE_CAL: 5,
   POINTS_PER_WORKOUT_MINUTE: 0.2, // 1 point per 5 minutes of exercise
-  POINTS_PER_MILE: 3,
+  POINTS_PER_STAND_HOUR: 5, // 5 points per hour stood
 } as const;
 
 // Legacy export for backwards compatibility
@@ -21,7 +21,7 @@ export interface ScoringConfig {
   points_per_sleep_hour?: number;
   points_per_100_active_cal?: number;
   points_per_workout?: number;
-  points_per_mile?: number;
+  points_per_stand_hour?: number;
 }
 
 /**
@@ -35,7 +35,7 @@ export function getScoringConfig(leagueConfig?: ScoringConfig | null): typeof DE
     POINTS_PER_SLEEP_HOUR: (leagueConfig.points_per_sleep_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR) as 2,
     POINTS_PER_100_ACTIVE_CAL: (leagueConfig.points_per_100_active_cal ?? DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL) as 5,
     POINTS_PER_WORKOUT_MINUTE: (leagueConfig.points_per_workout ?? DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE) as 0.2,
-    POINTS_PER_MILE: (leagueConfig.points_per_mile ?? DEFAULT_SCORING_CONFIG.POINTS_PER_MILE) as 3,
+    POINTS_PER_STAND_HOUR: (leagueConfig.points_per_stand_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_STAND_HOUR) as 5,
   };
 }
 
@@ -43,8 +43,8 @@ export interface FitnessMetrics {
   steps: number;
   sleepHours: number;
   calories: number;
-  workouts: number;
-  distance: number; // in miles
+  workouts: number; // in minutes
+  standHours: number; // hours stood up
 }
 
 export interface PointsBreakdown {
@@ -52,7 +52,7 @@ export interface PointsBreakdown {
   sleepPoints: number;
   caloriesPoints: number;
   workoutsPoints: number;
-  distancePoints: number;
+  standHoursPoints: number;
   totalPoints: number;
 }
 
@@ -69,7 +69,7 @@ const SANITIZATION_CAPS = {
   MAX_SLEEP_HOURS: 24, // can't sleep more than 24 hours
   MAX_CALORIES: 10000, // ~5x average daily burn
   MAX_WORKOUT_MINUTES: 1440, // can't exercise more than 24 hours/day (1440 minutes)
-  MAX_DISTANCE: 150, // ~ultra-marathon distance
+  MAX_STAND_HOURS: 16, // can't stand more than 16 hours/day (need sleep)
 } as const;
 
 /**
@@ -95,7 +95,7 @@ export function sanitizeMetrics(metrics: FitnessMetrics): FitnessMetrics {
     sleepHours: sanitize(metrics.sleepHours, SANITIZATION_CAPS.MAX_SLEEP_HOURS),
     calories: sanitize(metrics.calories, SANITIZATION_CAPS.MAX_CALORIES),
     workouts: sanitize(metrics.workouts, SANITIZATION_CAPS.MAX_WORKOUT_MINUTES),
-    distance: sanitize(metrics.distance, SANITIZATION_CAPS.MAX_DISTANCE),
+    standHours: sanitize(metrics.standHours, SANITIZATION_CAPS.MAX_STAND_HOURS),
   };
 }
 
@@ -115,9 +115,9 @@ export function calculatePoints(metrics: FitnessMetrics, config?: typeof DEFAULT
   const sleepPoints = safe.sleepHours * scoringConfig.POINTS_PER_SLEEP_HOUR;
   const caloriesPoints = (safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL;
   const workoutsPoints = safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE;
-  const distancePoints = safe.distance * scoringConfig.POINTS_PER_MILE;
+  const standHoursPoints = safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR;
   
-  return Math.round((stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + distancePoints) * 100) / 100;
+  return Math.round((stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints) * 100) / 100;
 }
 
 /**
@@ -136,15 +136,15 @@ export function getPointsBreakdown(metrics: FitnessMetrics, config?: typeof DEFA
   const sleepPoints = Math.round(safe.sleepHours * scoringConfig.POINTS_PER_SLEEP_HOUR * 100) / 100;
   const caloriesPoints = Math.round((safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL * 100) / 100;
   const workoutsPoints = Math.round(safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE * 100) / 100;
-  const distancePoints = Math.round(safe.distance * scoringConfig.POINTS_PER_MILE * 100) / 100;
+  const standHoursPoints = Math.round(safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR * 100) / 100;
   
   return {
     stepsPoints,
     sleepPoints,
     caloriesPoints,
     workoutsPoints,
-    distancePoints,
-    totalPoints: stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + distancePoints,
+    standHoursPoints,
+    totalPoints: stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints,
   };
 }
 
@@ -251,7 +251,7 @@ export function getScoringRules(config?: typeof DEFAULT_SCORING_CONFIG): { metri
  */
 export function aggregateWeeklyMetrics(dailyMetrics: FitnessMetrics[]): FitnessMetrics {
   if (!dailyMetrics || dailyMetrics.length === 0) {
-    return { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 };
+    return { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0 };
   }
   
   return dailyMetrics.reduce(
@@ -260,9 +260,9 @@ export function aggregateWeeklyMetrics(dailyMetrics: FitnessMetrics[]): FitnessM
       sleepHours: acc.sleepHours + (Number(day?.sleepHours) || 0),
       calories: acc.calories + (Number(day?.calories) || 0),
       workouts: acc.workouts + (Number(day?.workouts) || 0),
-      distance: acc.distance + (Number(day?.distance) || 0),
+      standHours: acc.standHours + (Number(day?.standHours) || 0),
     }),
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 }
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0 }
   );
 }
 
