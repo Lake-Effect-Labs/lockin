@@ -18,12 +18,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.lockin.app",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In uses Health data to power fitness leagues and insights.",
         "NSHealthUpdateUsageDescription": "Lock-In writes workout data you log.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["fetch", "processing"]
+        "UIBackgroundModes": [
+          "fetch",
+          "processing"
+        ]
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
@@ -59,6 +62,14 @@
         {
           "androidAppId": "ca-app-pub-3940256099942544~3347511713",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
         }
       ]
     ],
