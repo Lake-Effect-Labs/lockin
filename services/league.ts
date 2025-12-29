@@ -57,6 +57,48 @@ export interface LeagueDashboard {
 }
 
 /**
+ * Validate league can start
+ * @returns { canStart: boolean, message: string }
+ */
+export async function validateLeagueStart(leagueId: string, league: League): Promise<{ canStart: boolean; message: string }> {
+  const members = await getLeagueMembers(leagueId);
+  
+  if (league.start_date) {
+    return { canStart: false, message: 'League has already started' };
+  }
+  
+  if (members.length < league.max_players) {
+    const needed = league.max_players - members.length;
+    return {
+      canStart: false,
+      message: `League not full: ${members.length}/${league.max_players}. Need ${needed} more player(s).`,
+    };
+  }
+  
+  return { canStart: true, message: 'League is ready to start' };
+}
+
+/**
+ * Start a league season (validates it's full first)
+ * @throws Error if league is not full
+ */
+export async function startLeague(leagueId: string, league: League): Promise<void> {
+  // Get current members
+  const members = await getLeagueMembers(leagueId);
+  
+  // Check if league is full
+  if (members.length < league.max_players) {
+    throw new Error(
+      `League must be full to start (${members.length}/${league.max_players} players). ` +
+      `Invite ${league.max_players - members.length} more player(s).`
+    );
+  }
+  
+  // League is full, start the season
+  await startLeagueSeason(leagueId);
+}
+
+/**
  * Create a new league
  * @throws Error if league size is invalid
  */

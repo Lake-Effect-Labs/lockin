@@ -37,6 +37,7 @@ import { WeekProgressBar, Countdown } from '@/components/WeekProgressBar';
 import { PointsBreakdown } from '@/components/StatBubble';
 import { SyncStatusIndicator, LiveIndicator } from '@/components/SyncStatusIndicator';
 import { SmartAdBanner } from '@/components/AdBanner';
+import { formatScoreForDisplay, validateScore } from '@/services/validation';
 import { getPointsBreakdown, getScoringConfig } from '@/services/scoring';
 import { colors } from '@/utils/colors';
 import { WeeklyRecap } from '@/components/WeeklyRecap';
@@ -349,8 +350,12 @@ Join Code: ${joinCode}`;
   }
   
   // Calculate current scores (use breakdown totals for accuracy)
-  const calculatedMyScore = breakdown?.totalPoints ?? userScore?.total_points ?? 0;
-  const calculatedOpponentScore = opponentBreakdown?.totalPoints ?? opponentScore?.total_points ?? 0;
+  // Validate scores before displaying - show "--" if null/invalid
+  const myScore = breakdown?.totalPoints ?? userScore?.total_points;
+  const opponentScore_ = opponentBreakdown?.totalPoints ?? opponentScore?.total_points;
+  
+  const myScoreDisplay = formatScoreForDisplay(myScore, '--');
+  const opponentScoreDisplay = formatScoreForDisplay(opponentScore_, '--');
   
   return (
     <SafeAreaView style={styles.container}>
@@ -489,8 +494,8 @@ Join Code: ${joinCode}`;
                 currentUserId={user?.id || ''}
                 userScore={userScore}
                 opponentScore={opponentScore}
-                calculatedMyScore={calculatedMyScore}
-                calculatedTheirScore={calculatedOpponentScore}
+                calculatedMyScore={parseFloat(myScoreDisplay) || 0}
+                calculatedTheirScore={parseFloat(opponentScoreDisplay) || 0}
                 daysRemaining={daysRemaining}
                 onPress={() => router.push(`/(app)/league/${leagueId}/matchup`)}
               />

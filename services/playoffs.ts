@@ -35,40 +35,76 @@ export interface PlayoffMatchDisplay {
 }
 
 /**
- * Get top 4 players for playoffs based on standings
+ * Get playoff qualifiers based on league size
+ * 4-player: top 4
+ * 6-player: top 4
+ * 8-player: top 8
+ * 10-player: top 8
+ * 12-player: top 8
+ * 14-player: top 8
  */
-export function getPlayoffQualifiers(members: LeagueMember[]): LeagueMember[] {
+export function getPlayoffQualifiers(members: LeagueMember[], leagueSize?: number): LeagueMember[] {
   // Sort by wins (desc), then total points (desc)
   const sorted = [...members].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.total_points - a.total_points;
   });
   
-  return sorted.slice(0, 4);
+  // Determine playoff pool size based on league size
+  const playoffSize = leagueSize ? (leagueSize >= 8 ? 8 : 4) : 4;
+  
+  return sorted.slice(0, Math.min(playoffSize, sorted.length));
 }
 
 /**
- * Generate playoff matchups from standings
- * Returns: { semifinals: [[1st vs 4th], [2nd vs 3rd]], finals: null }
+ * Generate playoff matchups for any league size
+ * 4-player: 2 semifinals, 1 final
+ * 8-player: 4 quarterfinals, 2 semifinals, 1 final
  */
 export function generatePlayoffMatchups(qualifiers: LeagueMember[]): {
   semifinal1: { player1: LeagueMember; player2: LeagueMember };
   semifinal2: { player1: LeagueMember; player2: LeagueMember };
+  quarterfinal1?: { player1: LeagueMember; player2: LeagueMember };
+  quarterfinal2?: { player1: LeagueMember; player2: LeagueMember };
 } {
-  if (qualifiers.length < 4) {
+  const count = qualifiers.length;
+  
+  if (count < 4) {
     throw new Error('Need at least 4 players for playoffs');
   }
   
-  // Seed 1 vs Seed 4
-  // Seed 2 vs Seed 3
+  if (count === 4) {
+    // Standard 4-player bracket: 1vs4, 2vs3
+    return {
+      semifinal1: {
+        player1: qualifiers[0], // 1st seed
+        player2: qualifiers[3], // 4th seed
+      },
+      semifinal2: {
+        player1: qualifiers[1], // 2nd seed
+        player2: qualifiers[2], // 3rd seed
+      },
+    };
+  }
+  
+  // 8-player bracket: quarterfinals first
+  // 1vs8, 2vs7, 3vs6, 4vs5
   return {
-    semifinal1: {
+    quarterfinal1: {
       player1: qualifiers[0], // 1st seed
-      player2: qualifiers[3], // 4th seed
+      player2: qualifiers[7], // 8th seed
+    },
+    quarterfinal2: {
+      player1: qualifiers[1], // 2nd seed
+      player2: qualifiers[6], // 7th seed
+    },
+    semifinal1: {
+      player1: qualifiers[2], // 3rd seed
+      player2: qualifiers[5], // 6th seed
     },
     semifinal2: {
-      player1: qualifiers[1], // 2nd seed
-      player2: qualifiers[2], // 3rd seed
+      player1: qualifiers[3], // 4th seed
+      player2: qualifiers[4], // 5th seed
     },
   };
 }
