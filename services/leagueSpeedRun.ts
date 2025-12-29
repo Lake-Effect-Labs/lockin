@@ -142,7 +142,8 @@ export async function runLeagueSpeedRun(
     // Create bot users and add as members
     const botIds: string[] = [];
     for (let i = 0; i < playerCount - 1; i++) {
-      const botId = `bot-${leagueId}-${i}`;
+      // Generate proper UUID v4 format for bot
+      const botId = `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`;
       botIds.push(botId);
 
       // Create bot user profile
@@ -430,7 +431,8 @@ export async function cleanupSpeedRunLeague(leagueId: string, userId: string): P
 
   if (members) {
     for (const member of members) {
-      if (member.user_id.startsWith('bot-')) {
+      // Check if this is a bot user (UUID format: 00000000-0000-4000-8000-XXXX)
+      if (member.user_id.startsWith('00000000-0000-4000-8000-')) {
         await supabase.from('users').delete().eq('id', member.user_id);
       }
     }
