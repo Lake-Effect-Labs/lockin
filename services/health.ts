@@ -252,15 +252,21 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     console.log('📊 [Steps] Query:', {
       from: from.toISOString(),
       to: to.toISOString(),
+      fromMs: from.getTime(),
+      toMs: to.getTime(),
     });
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    // API: queryQuantitySamples(typeIdentifier, { from, to })
+    // API: queryQuantitySamples(typeIdentifier, { limit }) - use limit instead of date ranges
     if (typeof module.queryQuantitySamples === 'function') {
+      // Query samples - by default returns recent samples
+      // We'll filter by startDate/endDate on the response
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        { from, to }
+        {
+          limit: 100, // Get up to 100 samples
+        }
       );
 
       console.log('📊 [Steps] Raw response:', {
@@ -270,13 +276,23 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
         sampleKeys: samples?.[0] ? Object.keys(samples[0]) : [],
       });
 
-      // Sum all step samples for the day
+      // Filter samples for today and sum them
       if (samples && Array.isArray(samples)) {
-        const total = samples.reduce((sum: number, sample: any) => {
-          // Try multiple property names - different versions might use different names
-          const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
-          return sum + value;
-        }, 0);
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const total = samples
+          .filter((sample: any) => {
+            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+            return sampleDate >= dayStart && sampleDate <= dayEnd;
+          })
+          .reduce((sum: number, sample: any) => {
+            // Try multiple property names - different versions might use different names
+            const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
+            return sum + value;
+          }, 0);
         console.log('📊 [Steps] Total calculated:', total);
         return Math.round(total);
       }
@@ -315,18 +331,22 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     let results: any[] = [];
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API: queryCategorySamples(typeIdentifier, { from, to })
+    // API: queryCategorySamples(typeIdentifier, { limit }) - use limit parameter
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
-        { from, to }
+        {
+          limit: 100, // Get up to 100 sleep samples
+        }
       );
     }
     // Fallback: try queryQuantitySamples with sleep type
     else if (typeof module.queryQuantitySamples === 'function') {
       results = await module.queryQuantitySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
-        { from, to }
+        {
+          limit: 100,
+        }
       );
     }
 
@@ -334,20 +354,33 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       return 0;
     }
 
+    // Filter for today's sleep and sum up all sleep periods (in hours)
+    // Sleep from the previous night typically ends in the morning of the target date
+    const dayStart = new Date(date);
+    dayStart.setDate(dayStart.getDate() - 1);
+    dayStart.setHours(18, 0, 0, 0); // Start from 6 PM previous day
+    const dayEnd = new Date(date);
+    dayEnd.setHours(12, 0, 0, 0); // End at noon current day
+    
     // Sum up all sleep periods (in hours)
     // Filter for actual sleep (not "inBed" which is just time in bed)
-    const totalMinutes = results.reduce((sum: number, sample: any) => {
-      // Skip "inBed" samples - only count actual sleep
-      // value 0 = inBed, value 1+ = various sleep stages
-      const value = sample?.value ?? sample?.category ?? 1;
-      if (value === 0) {
-        return sum;
-      }
+    const totalMinutes = results
+      .filter((sample: any) => {
+        const endDate = new Date(sample?.endDate || sample?.date || 0);
+        return endDate >= dayStart && endDate <= dayEnd;
+      })
+      .reduce((sum: number, sample: any) => {
+        // Skip "inBed" samples - only count actual sleep
+        // value 0 = inBed, value 1+ = various sleep stages
+        const value = sample?.value ?? sample?.category ?? 1;
+        if (value === 0) {
+          return sum;
+        }
 
-      const start = new Date(sample.startDate).getTime();
-      const end = new Date(sample.endDate).getTime();
-      return sum + (end - start) / (1000 * 60);
-    }, 0);
+        const start = new Date(sample.startDate).getTime();
+        const end = new Date(sample.endDate).getTime();
+        return sum + (end - start) / (1000 * 60);
+      }, 0);
 
     return totalMinutes / 60;
   } catch (err: any) {
@@ -375,19 +408,31 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(typeIdentifier, { from, to })
+    // API: queryQuantitySamples uses limit parameter
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
-        { from, to }
+        {
+          limit: 100, // Get up to 100 samples
+        }
       );
 
-      // Sum all calorie samples for the day
+      // Filter samples for today and sum them
       if (samples && Array.isArray(samples)) {
-        const total = samples.reduce((sum: number, sample: any) => {
-          const value = sample?.quantity ?? sample?.value ?? 0;
-          return sum + value;
-        }, 0);
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const total = samples
+          .filter((sample: any) => {
+            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+            return sampleDate >= dayStart && sampleDate <= dayEnd;
+          })
+          .reduce((sum: number, sample: any) => {
+            const value = sample?.quantity ?? sample?.value ?? 0;
+            return sum + value;
+          }, 0);
         return Math.round(total);
       }
     }
