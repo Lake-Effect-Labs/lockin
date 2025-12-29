@@ -211,6 +211,7 @@ export interface WeeklyScore {
   sleep_hours: number;
   calories: number;
   workouts: number;
+  standHours: number;
   distance: number;
   total_points: number;
   last_synced_at: string;
@@ -683,6 +684,7 @@ export async function upsertWeeklyScore(
     sleep_hours: number;
     calories: number;
     workouts: number;
+    standHours: number;
     distance: number;
   }
 ): Promise<WeeklyScore> {

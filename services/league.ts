@@ -385,6 +385,7 @@ export async function syncUserScore(
     sleep_hours: sanitized.sleepHours,
     calories: sanitized.calories,
     workouts: sanitized.workouts,
+    standHours: sanitized.standHours,
     distance: sanitized.distance,
   });
 }

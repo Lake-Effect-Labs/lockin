@@ -59,6 +59,7 @@ export default function MatchupScreen() {
     sleepHours: userScore.sleep_hours,
     calories: userScore.calories,
     workouts: userScore.workouts,
+    standHours: userScore.standHours,
     distance: userScore.distance,
   }, leagueScoringConfig) : null;
   
@@ -67,6 +68,7 @@ export default function MatchupScreen() {
     sleepHours: opponentScore.sleep_hours,
     calories: opponentScore.calories,
     workouts: opponentScore.workouts,
+    standHours: opponentScore.standHours,
     distance: opponentScore.distance,
   }, leagueScoringConfig) : null;
   
@@ -180,10 +182,17 @@ export default function MatchupScreen() {
             />
             <StatComparisonRow
               icon="💪"
-              label="Workouts"
+              label="Workout Mins"
               value1={userScore?.workouts || 0}
               value2={opponentScore?.workouts || 0}
-              format={(v) => v.toString()}
+              format={(v) => `${v}m`}
+            />
+            <StatComparisonRow
+              icon="🧑‍💼"
+              label="Stand Hours"
+              value1={userScore?.standHours || 0}
+              value2={opponentScore?.standHours || 0}
+              format={(v) => `${v}h`}
             />
             <StatComparisonRow
               icon="🏃"
