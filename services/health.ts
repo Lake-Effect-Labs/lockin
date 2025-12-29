@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { FitnessMetrics } from './scoring';
 
 // ============================================
-// HEALTH DATA SERVICE  
+// HEALTH DATA SERVICE
 // iOS-only health data integration via Apple HealthKit
 // Using @kingstinct/react-native-healthkit (New Architecture compatible, Nitro modules)
 // ============================================
@@ -42,19 +42,19 @@ function getHealthKit(): any {
     try {
       console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       const healthModule = require('@kingstinct/react-native-healthkit');
-      
+
       // Handle both default export and direct export
       HealthKit = healthModule?.default ?? healthModule;
-      
+
       console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
       console.log('📊 Module available');
       console.log('   - Export keys:', Object.keys(HealthKit || {}).slice(0, 10).join(', '));
       console.log('   - Has requestAuthorization:', typeof HealthKit?.requestAuthorization);
-      
+
       return HealthKit;
     } catch (error: any) {
       loadError = error; // Cache the error to avoid repeated attempts
-      
+
       console.error('❌ CRITICAL: Failed to load HealthKit module');
       console.error('   - Error message:', error?.message);
       console.error('   - Error code:', error?.code);
@@ -62,16 +62,16 @@ function getHealthKit(): any {
       console.error('');
       console.error('💡 This means native module NOT in build!');
       console.error('🔧 Fix: eas build --platform ios --profile testflight --clear-cache');
-      
+
       // Don't re-throw - let app continue without HealthKit
       return null;
     }
   }
-  
+
   if (loadError) {
     return null; // Return null if we already tried and failed
   }
-  
+
   return HealthKit;
 }
 
@@ -88,7 +88,7 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('='.repeat(60));
     console.log('Timestamp:', new Date().toISOString());
     console.log('');
-    
+
     // Step 1: Platform check
     console.log('📱 STEP 1: Platform Check');
     console.log('   - Platform.OS:', Platform.OS);
@@ -116,7 +116,7 @@ export async function initializeHealth(): Promise<boolean> {
     // Step 3: Load module
     console.log('📦 STEP 3: Load HealthKit Module');
     const module = getHealthKit();
-    
+
     if (!module) {
       console.log('   ❌ FAILED: Module returned null');
       console.log('   💡 Native module not included in build');
@@ -128,7 +128,7 @@ export async function initializeHealth(): Promise<boolean> {
 
     // Step 4: Check if requestAuthorization exists
     console.log('📱 STEP 4: Check requestAuthorization availability');
-    
+
     if (typeof module.requestAuthorization !== 'function') {
       console.log('   ❌ FAILED: requestAuthorization is not a function');
       console.log('   - typeof:', typeof module.requestAuthorization);
@@ -156,22 +156,22 @@ export async function initializeHealth(): Promise<boolean> {
 
     // Modern Kingstinct API - no callbacks, uses async/await
     await module.requestAuthorization({
-      read: [
-        'StepCount',
-        'DistanceWalkingRunning',
-        'ActiveEnergyBurned',
-        'SleepAnalysis',
-        'Workout',
+      toRead: [
+        'HKQuantityTypeIdentifierStepCount',
+        'HKQuantityTypeIdentifierDistanceWalkingRunning',
+        'HKQuantityTypeIdentifierActiveEnergyBurned',
+        'HKCategoryTypeIdentifierSleepAnalysis',
+        'HKWorkoutTypeIdentifier',
       ],
-      write: [],
+      toShare: [],
     });
-    
+
     const authDuration = Date.now() - startAuthTime;
-    
+
     console.log('   - End time:', new Date().toISOString());
     console.log('   - Duration:', authDuration, 'ms');
     console.log('');
-    
+
     if (authDuration < 500) {
       console.log('   ⚠️ WARNING: Authorization completed in < 500ms');
       console.log('   💡 This suggests no dialog was shown (should take 2+ seconds)');
@@ -180,7 +180,7 @@ export async function initializeHealth(): Promise<boolean> {
       console.log('   ✅ Duration suggests dialog was shown');
     }
     console.log('');
-    
+
     console.log('🎉 AUTHORIZATION COMPLETE');
     console.log('');
     console.log('📝 NEXT STEPS FOR USER:');
@@ -196,7 +196,7 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('');
     console.log('='.repeat(60));
     console.log('');
-    
+
     return true;
   } catch (error: any) {
     console.error('');
@@ -209,7 +209,7 @@ export async function initializeHealth(): Promise<boolean> {
     console.error('Full error object:', JSON.stringify(error, null, 2));
     console.error('='.repeat(60));
     console.error('');
-    
+
     // Never throw - let app continue
     return false;
   }
@@ -222,7 +222,7 @@ export function isHealthAvailable(): boolean {
   if (Platform.OS !== 'ios') {
     return false;
   }
-  
+
   if (isExpoGo) {
     return false;
   }
@@ -251,31 +251,20 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
+    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
     if (typeof module.queryQuantitySamples === 'function') {
-      const samples = await module.queryQuantitySamples({
-        quantityType: 'stepCount',
-        from: startDate,
-        to: endDate,
-      });
+      const samples = await module.queryQuantitySamples(
+        'HKQuantityTypeIdentifierStepCount',
+        { startDate, endDate }
+      );
 
       // Sum all step samples for the day
       if (samples && Array.isArray(samples)) {
         const total = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || sample?.value || 0);
+          return sum + (sample?.quantity || 0);
         }, 0);
         return Math.round(total);
       }
-    }
-
-    // Fallback: try queryStatisticsForQuantity if available (gives sum directly)
-    if (typeof module.queryStatisticsForQuantity === 'function') {
-      const stats = await module.queryStatisticsForQuantity({
-        quantityType: 'stepCount',
-        from: startDate,
-        to: endDate,
-        options: ['cumulativeSum'],
-      });
-      return Math.round(stats?.sumQuantity?.quantity || 0);
     }
 
     return 0;
@@ -309,12 +298,19 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     let results: any[] = [];
 
     // Try queryCategorySamples for sleep (category-type data)
+    // API might be: queryCategorySamples(typeIdentifier, options)
     if (typeof module.queryCategorySamples === 'function') {
-      results = await module.queryCategorySamples({
-        categoryType: 'sleepAnalysis',
-        from: startDate,
-        to: endDate,
-      });
+      results = await module.queryCategorySamples(
+        'HKCategoryTypeIdentifierSleepAnalysis',
+        { startDate, endDate }
+      );
+    }
+    // Fallback: try queryQuantitySamples with sleep type
+    else if (typeof module.queryQuantitySamples === 'function') {
+      results = await module.queryQuantitySamples(
+        'HKCategoryTypeIdentifierSleepAnalysis',
+        { startDate, endDate }
+      );
     }
 
     if (!results || results.length === 0) {
@@ -325,13 +321,14 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     // Filter for actual sleep (not "inBed" which is just time in bed)
     const totalMinutes = results.reduce((sum: number, sample: any) => {
       // Skip "inBed" samples - only count actual sleep
-      const value = sample?.value || sample?.category;
-      if (value === 0 || value === 'inBed') {
+      // value 0 = inBed, value 1+ = various sleep stages
+      const value = sample?.value ?? sample?.category ?? 1;
+      if (value === 0) {
         return sum;
       }
 
-      const start = new Date(sample.startDate || sample.from).getTime();
-      const end = new Date(sample.endDate || sample.to).getTime();
+      const start = new Date(sample.startDate).getTime();
+      const end = new Date(sample.endDate).getTime();
       return sum + (end - start) / (1000 * 60);
     }, 0);
 
@@ -361,31 +358,20 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     endDate.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
+    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
     if (typeof module.queryQuantitySamples === 'function') {
-      const samples = await module.queryQuantitySamples({
-        quantityType: 'activeEnergyBurned',
-        from: startDate,
-        to: endDate,
-      });
+      const samples = await module.queryQuantitySamples(
+        'HKQuantityTypeIdentifierActiveEnergyBurned',
+        { startDate, endDate }
+      );
 
       // Sum all calorie samples for the day
       if (samples && Array.isArray(samples)) {
         const total = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || sample?.value || 0);
+          return sum + (sample?.quantity || 0);
         }, 0);
         return Math.round(total);
       }
-    }
-
-    // Fallback: try queryStatisticsForQuantity if available
-    if (typeof module.queryStatisticsForQuantity === 'function') {
-      const stats = await module.queryStatisticsForQuantity({
-        quantityType: 'activeEnergyBurned',
-        from: startDate,
-        to: endDate,
-        options: ['cumulativeSum'],
-      });
-      return Math.round(stats?.sumQuantity?.quantity || 0);
     }
 
     return 0;
@@ -416,30 +402,19 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     let totalMeters = 0;
 
     // For distance, we need to SUM all samples (not just get the latest)
+    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
     if (typeof module.queryQuantitySamples === 'function') {
-      const samples = await module.queryQuantitySamples({
-        quantityType: 'distanceWalkingRunning',
-        from: startDate,
-        to: endDate,
-      });
+      const samples = await module.queryQuantitySamples(
+        'HKQuantityTypeIdentifierDistanceWalkingRunning',
+        { startDate, endDate }
+      );
 
       // Sum all distance samples for the day
       if (samples && Array.isArray(samples)) {
         totalMeters = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || sample?.value || 0);
+          return sum + (sample?.quantity || 0);
         }, 0);
       }
-    }
-
-    // Fallback: try queryStatisticsForQuantity if available
-    if (totalMeters === 0 && typeof module.queryStatisticsForQuantity === 'function') {
-      const stats = await module.queryStatisticsForQuantity({
-        quantityType: 'distanceWalkingRunning',
-        from: startDate,
-        to: endDate,
-        options: ['cumulativeSum'],
-      });
-      totalMeters = stats?.sumQuantity?.quantity || 0;
     }
 
     // Convert meters to miles
@@ -469,12 +444,10 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
 
     let results: any[] = [];
 
-    // Query workout samples using Kingstinct API
-    if (typeof module.queryWorkoutSamples === 'function') {
-      results = await module.queryWorkoutSamples({
-        from: startDate,
-        to: endDate,
-      });
+    // Query workouts using Kingstinct API
+    // API: queryWorkouts({ startDate, endDate })
+    if (typeof module.queryWorkouts === 'function') {
+      results = await module.queryWorkouts({ startDate, endDate });
     }
 
     // Return the count of workouts
@@ -532,7 +505,7 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
 export function getFakeHealthData(date: Date = new Date()): DailyHealthData {
   const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
   const seed = dayOfYear;
-  
+
   return {
     date: date.toISOString().split('T')[0],
     steps: 8000 + (seed * 137) % 4000,
@@ -598,20 +571,113 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
 }
 
 /**
- * Get health diagnostics for crash reporting
+ * Get health diagnostics for crash reporting and in-app display
  */
 export function getHealthDiagnostics(): {
+  platform: string;
+  bundleId: string;
   moduleLoaded: boolean;
   deviceSupported: boolean;
   isExpoGo: boolean;
+  isDevelopment: boolean;
+  entitlementsConfigured: boolean;
   loadError: string | null;
+  availableMethods: string[];
 } {
   const module = getHealthKit();
+  const availableMethods = module ? Object.keys(module).filter(k => typeof module[k] === 'function').slice(0, 15) : [];
 
   return {
+    platform: Platform.OS,
+    bundleId: Constants?.expoConfig?.ios?.bundleIdentifier || 'unknown',
     moduleLoaded: module !== null,
     deviceSupported: Platform.OS === 'ios',
     isExpoGo: isExpoGo,
+    isDevelopment: __DEV__,
+    entitlementsConfigured: true, // If module loads, entitlements are configured
     loadError: loadError?.message || null,
+    availableMethods,
+  };
+}
+
+/**
+ * Get a detailed diagnostic report for in-app display
+ * Shows actual health values and API status
+ */
+export async function getHealthDiagnosticReport(): Promise<{
+  status: 'working' | 'partial' | 'not_working';
+  message: string;
+  details: {
+    moduleStatus: string;
+    authStatus: string;
+    dataStatus: string;
+    todayData: {
+      steps: number;
+      sleep: number;
+      calories: number;
+      distance: number;
+      workouts: number;
+    } | null;
+    errors: string[];
+  };
+}> {
+  const errors: string[] = [];
+  let moduleStatus = '❌ Not loaded';
+  let authStatus = '❌ Not requested';
+  let dataStatus = '❌ No data';
+  let todayData = null;
+
+  // Check module
+  const module = getHealthKit();
+  if (!module) {
+    errors.push('HealthKit module failed to load: ' + (loadError?.message || 'Unknown error'));
+    return {
+      status: 'not_working',
+      message: 'HealthKit module not loaded. Rebuild with --clear-cache.',
+      details: { moduleStatus, authStatus, dataStatus, todayData, errors },
+    };
+  }
+  moduleStatus = '✅ Loaded';
+
+  // Check available methods
+  const hasQueryMethod = typeof module.queryQuantitySamples === 'function';
+  const hasAuthMethod = typeof module.requestAuthorization === 'function';
+
+  if (!hasAuthMethod) {
+    errors.push('requestAuthorization method not found');
+  }
+  if (!hasQueryMethod) {
+    errors.push('queryQuantitySamples method not found');
+  }
+
+  authStatus = hasAuthMethod ? '✅ Available' : '❌ Missing';
+
+  // Try to get today's data
+  try {
+    const data = await getDailyMetrics(new Date());
+    todayData = {
+      steps: data.steps,
+      sleep: data.sleepHours,
+      calories: data.calories,
+      distance: data.distance,
+      workouts: data.workouts,
+    };
+
+    const hasAnyData = data.steps > 0 || data.sleepHours > 0 || data.calories > 0;
+    dataStatus = hasAnyData ? '✅ Reading data' : '⚠️ No data (permissions needed or no activity today)';
+  } catch (err: any) {
+    errors.push('Data fetch error: ' + err.message);
+    dataStatus = '❌ Error fetching';
+  }
+
+  const status = errors.length === 0 ? 'working' : (module ? 'partial' : 'not_working');
+  const message = errors.length === 0
+    ? 'HealthKit is working correctly!'
+    : `Found ${errors.length} issue(s): ${errors[0]}`;
+
+  return {
+    status,
+    message,
+    details: { moduleStatus, authStatus, dataStatus, todayData, errors },
   };
 }

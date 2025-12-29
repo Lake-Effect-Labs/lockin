@@ -29,7 +29,7 @@ import {
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
-import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth } from '@/services/health';
+import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport } from '@/services/health';
 import {
   runFullRegressionSuite,
   RegressionTestResults,
@@ -643,7 +643,46 @@ export default function DebugScreen() {
             <Ionicons name="bug" size={20} color={colors.status.warning} />
             <Text style={styles.secondaryText}>Test Native Linking</Text>
           </TouchableOpacity>
-          
+
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                const report = await getHealthDiagnosticReport();
+                const d = report.details;
+
+                let dataText = 'No data retrieved';
+                if (d.todayData) {
+                  dataText = `Steps: ${d.todayData.steps.toLocaleString()}\n` +
+                    `Sleep: ${d.todayData.sleep.toFixed(1)} hrs\n` +
+                    `Calories: ${d.todayData.calories.toLocaleString()} cal\n` +
+                    `Distance: ${d.todayData.distance.toFixed(2)} mi\n` +
+                    `Workouts: ${d.todayData.workouts}`;
+                }
+
+                const errorsText = d.errors.length > 0
+                  ? `\n\n❌ ERRORS:\n${d.errors.join('\n')}`
+                  : '';
+
+                Alert.alert(
+                  `📊 Health Data Report: ${report.status.toUpperCase()}`,
+                  `${report.message}\n\n` +
+                  `MODULE: ${d.moduleStatus}\n` +
+                  `AUTH: ${d.authStatus}\n` +
+                  `DATA: ${d.dataStatus}\n\n` +
+                  `TODAY'S VALUES:\n${dataText}` +
+                  errorsText
+                );
+              } catch (error: any) {
+                Alert.alert('❌ Error', `Report failed: ${error.message}`);
+              }
+            }}
+            style={[styles.secondaryButton, { borderColor: colors.status.success }]}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="analytics" size={20} color={colors.status.success} />
+            <Text style={[styles.secondaryText, { color: colors.status.success }]}>📊 Show Today's Health Data</Text>
+          </TouchableOpacity>
+
           {/* Health Test Results */}
           {healthResults && (
             <View style={styles.healthResultsCard}>
