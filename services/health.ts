@@ -243,24 +243,24 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
   }
 
   try {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
 
     console.log('📊 [Steps] Query:', {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      from: from.toISOString(),
+      to: to.toISOString(),
     });
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
+    // API: queryQuantitySamples(typeIdentifier, { from, to })
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        { startDate, endDate }
+        { from, to }
       );
 
       console.log('📊 [Steps] Raw response:', {
@@ -305,28 +305,28 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
   try {
     // For sleep, we look at the night before (sleep ending on this date)
     // Sleep from the previous night typically ends in the morning of the target date
-    const startDate = new Date(date);
-    startDate.setDate(startDate.getDate() - 1);
-    startDate.setHours(18, 0, 0, 0); // Start from 6 PM previous day
+    const from = new Date(date);
+    from.setDate(from.getDate() - 1);
+    from.setHours(18, 0, 0, 0); // Start from 6 PM previous day
 
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
 
     let results: any[] = [];
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API might be: queryCategorySamples(typeIdentifier, options)
+    // API: queryCategorySamples(typeIdentifier, { from, to })
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
-        { startDate, endDate }
+        { from, to }
       );
     }
     // Fallback: try queryQuantitySamples with sleep type
     else if (typeof module.queryQuantitySamples === 'function') {
       results = await module.queryQuantitySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
-        { startDate, endDate }
+        { from, to }
       );
     }
 
@@ -368,24 +368,25 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
   }
 
   try {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
+    // API: queryQuantitySamples(typeIdentifier, { from, to })
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
-        { startDate, endDate }
+        { from, to }
       );
 
       // Sum all calorie samples for the day
       if (samples && Array.isArray(samples)) {
         const total = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || 0);
+          const value = sample?.quantity ?? sample?.value ?? 0;
+          return sum + value;
         }, 0);
         return Math.round(total);
       }
@@ -410,26 +411,27 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
   }
 
   try {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
 
     let totalMeters = 0;
 
     // For distance, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(typeIdentifier, { startDate, endDate })
+    // API: queryQuantitySamples(typeIdentifier, { from, to })
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
-        { startDate, endDate }
+        { from, to }
       );
 
       // Sum all distance samples for the day
       if (samples && Array.isArray(samples)) {
         totalMeters = samples.reduce((sum: number, sample: any) => {
-          return sum + (sample?.quantity || 0);
+          const value = sample?.quantity ?? sample?.value ?? 0;
+          return sum + value;
         }, 0);
       }
     }
@@ -453,18 +455,18 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
   }
 
   try {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
 
     let results: any[] = [];
 
     // Query workouts using Kingstinct API
-    // API: queryWorkouts({ startDate, endDate })
+    // API: queryWorkouts({ from, to })
     if (typeof module.queryWorkouts === 'function') {
-      results = await module.queryWorkouts({ startDate, endDate });
+      results = await module.queryWorkouts({ from, to });
     }
 
     // Return the count of workouts
@@ -713,14 +715,14 @@ export async function getHealthDiagnosticReport(): Promise<{
   if (hasQueryMethod) {
     try {
       const now = new Date();
-      const startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+      const from = new Date(now);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(now);
+      to.setHours(23, 59, 59, 999);
 
       const rawSamples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        { startDate, endDate }
+        { from, to }
       );
 
       if (rawSamples && rawSamples.length > 0) {
