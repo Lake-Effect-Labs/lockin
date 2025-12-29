@@ -25,6 +25,7 @@ import { SmartAdBanner } from '@/components/AdBanner';
 import { NetworkErrorBanner } from '@/components/NetworkErrorBanner';
 import { colors } from '@/utils/colors';
 import { getIsOnline } from '@/services/errorHandler';
+import { calculatePoints } from '@/services/scoring';
 
 // ============================================
 // HOME SCREEN
@@ -34,7 +35,7 @@ import { getIsOnline } from '@/services/errorHandler';
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const { leagues, fetchUserLeagues, isLoading, error: leagueError } = useLeagueStore();
-  const { weeklyTotals, weeklyPoints, syncWeekData, fakeMode, lastSyncedAt } = useHealthStore();
+  const { weeklyTotals, weeklyPoints, syncWeekData, fakeMode, lastSyncedAt, todayData } = useHealthStore();
   
   // Real-time sync hook - handles automatic background syncing
   const { isSyncing, refresh } = useRealtimeSync();
@@ -84,13 +85,13 @@ export default function HomeScreen() {
     await AsyncStorage.setItem('has_seen_welcome', 'true');
   }, []);
   
-  const stats = weeklyTotals ? [
-    { icon: '👟', value: weeklyTotals.steps.toLocaleString(), label: 'Steps', color: colors.primary[500] },
-    { icon: '😴', value: `${weeklyTotals.sleepHours.toFixed(1)}h`, label: 'Sleep', color: colors.secondary[500] },
-    { icon: '🔥', value: weeklyTotals.calories.toLocaleString(), label: 'Calories', color: '#E74C3C' },
-    { icon: '💪', value: weeklyTotals.workouts.toString(), label: 'Workouts', color: colors.accent[500] },
-    { icon: '🏃', value: `${weeklyTotals.distance.toFixed(1)}`, label: 'Miles', color: '#3498DB' },
-    { icon: '⭐', value: weeklyPoints.toFixed(0), label: 'Points', color: colors.sport.gold },
+  const stats = todayData ? [
+    { icon: '👟', value: todayData.steps.toLocaleString(), label: 'Steps', color: colors.primary[500] },
+    { icon: '😴', value: `${todayData.sleepHours.toFixed(1)}h`, label: 'Sleep', color: colors.secondary[500] },
+    { icon: '🔥', value: todayData.calories.toLocaleString(), label: 'Calories', color: '#E74C3C' },
+    { icon: '💪', value: todayData.workouts.toString(), label: 'Workouts', color: colors.accent[500] },
+    { icon: '🏃', value: `${todayData.distance.toFixed(1)}`, label: 'Miles', color: '#3498DB' },
+    { icon: '⭐', value: calculatePoints(todayData).toFixed(0), label: 'Points', color: colors.sport.gold },
   ] : [];
   
   return (
@@ -181,10 +182,10 @@ export default function HomeScreen() {
           </View>
         )}
         
-        {/* Weekly Stats */}
+        {/* Today's Stats */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>This Week's Stats</Text>
+            <Text style={styles.sectionTitle}>Today's Stats</Text>
           </View>
           {lastSyncedAt ? (
             <View style={styles.statsCard}>
