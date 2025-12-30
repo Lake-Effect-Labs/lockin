@@ -321,7 +321,7 @@ Join Code: ${joinCode}`;
         sleepHours: userScore.sleep_hours || 0,
         calories: userScore.calories || 0,
         workouts: userScore.workouts || 0,
-        standHours: userScore.standHours || 0,
+        standHours: userScore.stand_hours || 0,
         distance: userScore.distance || 0,
       }, leagueScoringConfig);
     }
@@ -332,7 +332,7 @@ Join Code: ${joinCode}`;
         sleepHours: opponentScore.sleep_hours || 0,
         calories: opponentScore.calories || 0,
         workouts: opponentScore.workouts || 0,
-        standHours: opponentScore.standHours || 0,
+        standHours: opponentScore.stand_hours || 0,
         distance: opponentScore.distance || 0,
       }, leagueScoringConfig);
     }
@@ -547,7 +547,7 @@ Join Code: ${joinCode}`;
               caloriesPoints={breakdown.caloriesPoints}
               workouts={userScore?.workouts || 0}
               workoutsPoints={breakdown.workoutsPoints}
-              standHours={userScore?.standHours || 0}
+              standHours={userScore?.stand_hours || 0}
               standHoursPoints={breakdown.standHoursPoints}
               distance={userScore?.distance || 0}
               distancePoints={breakdown.distancePoints}

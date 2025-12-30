@@ -258,14 +258,14 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    // API: queryQuantitySamples(typeIdentifier, { limit }) - use limit instead of date ranges
+    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use date range for accurate filtering
     if (typeof module.queryQuantitySamples === 'function') {
-      // Query samples - by default returns recent samples
-      // We'll filter by startDate/endDate on the response
+      // Query samples with date range to get only today's data
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          limit: 100, // Get up to 100 samples
+          from: from,
+          to: to,
         }
       );
 
@@ -283,17 +283,34 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
         const dayEnd = new Date(date);
         dayEnd.setHours(23, 59, 59, 999);
         
-        const total = samples
-          .filter((sample: any) => {
-            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-            return sampleDate >= dayStart && sampleDate <= dayEnd;
-          })
-          .reduce((sum: number, sample: any) => {
-            // Try multiple property names - different versions might use different names
-            const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
-            return sum + value;
-          }, 0);
-        console.log('📊 [Steps] Total calculated:', total);
+        console.log('📊 [Steps] Filtering samples:', {
+          dayStart: dayStart.toISOString(),
+          dayEnd: dayEnd.toISOString(),
+          totalSamples: samples.length,
+        });
+        
+        const filteredSamples = samples.filter((sample: any) => {
+          const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+          const isInRange = sampleDate >= dayStart && sampleDate <= dayEnd;
+          if (!isInRange && samples.length < 10) {
+            console.log('📊 [Steps] Sample outside range:', {
+              sampleDate: sampleDate.toISOString(),
+              startDate: sample?.startDate,
+              isInRange,
+            });
+          }
+          return isInRange;
+        });
+        
+        console.log('📊 [Steps] Filtered samples:', filteredSamples.length);
+        
+        const total = filteredSamples.reduce((sum: number, sample: any) => {
+          // Try multiple property names - different versions might use different names
+          const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
+          return sum + value;
+        }, 0);
+        
+        console.log('📊 [Steps] Total calculated:', total, 'from', filteredSamples.length, 'samples');
         return Math.round(total);
       }
     } else {
@@ -331,12 +348,13 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     let results: any[] = [];
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API: queryCategorySamples(typeIdentifier, { limit }) - use limit parameter
+    // API: queryCategorySamples(typeIdentifier, { from, to }) - use date range for accurate filtering
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          limit: 100, // Get up to 100 sleep samples
+          from: from,
+          to: to,
         }
       );
     }
@@ -345,12 +363,20 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       results = await module.queryQuantitySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          limit: 100,
+          from: from,
+          to: to,
         }
       );
     }
 
+    console.log('😴 [Sleep] Raw response:', {
+      isArray: Array.isArray(results),
+      length: results?.length,
+      firstSample: results?.[0] ? JSON.stringify(results[0]).substring(0, 200) : 'none',
+    });
+
     if (!results || results.length === 0) {
+      console.log('😴 [Sleep] No samples found');
       return 0;
     }
 
@@ -362,27 +388,37 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     const dayEnd = new Date(date);
     dayEnd.setHours(12, 0, 0, 0); // End at noon current day
     
+    console.log('😴 [Sleep] Filtering samples:', {
+      dayStart: dayStart.toISOString(),
+      dayEnd: dayEnd.toISOString(),
+      totalSamples: results.length,
+    });
+    
     // Sum up all sleep periods (in hours)
     // Filter for actual sleep (not "inBed" which is just time in bed)
-    const totalMinutes = results
-      .filter((sample: any) => {
-        const endDate = new Date(sample?.endDate || sample?.date || 0);
-        return endDate >= dayStart && endDate <= dayEnd;
-      })
-      .reduce((sum: number, sample: any) => {
-        // Skip "inBed" samples - only count actual sleep
-        // value 0 = inBed, value 1+ = various sleep stages
-        const value = sample?.value ?? sample?.category ?? 1;
-        if (value === 0) {
-          return sum;
-        }
+    const filteredSamples = results.filter((sample: any) => {
+      const endDate = new Date(sample?.endDate || sample?.date || 0);
+      return endDate >= dayStart && endDate <= dayEnd;
+    });
+    
+    console.log('😴 [Sleep] Filtered samples:', filteredSamples.length);
+    
+    const totalMinutes = filteredSamples.reduce((sum: number, sample: any) => {
+      // Skip "inBed" samples - only count actual sleep
+      // value 0 = inBed, value 1+ = various sleep stages
+      const value = sample?.value ?? sample?.category ?? 1;
+      if (value === 0) {
+        return sum;
+      }
 
-        const start = new Date(sample.startDate).getTime();
-        const end = new Date(sample.endDate).getTime();
-        return sum + (end - start) / (1000 * 60);
-      }, 0);
+      const start = new Date(sample.startDate).getTime();
+      const end = new Date(sample.endDate).getTime();
+      return sum + (end - start) / (1000 * 60);
+    }, 0);
 
-    return totalMinutes / 60;
+    const totalHours = totalMinutes / 60;
+    console.log('😴 [Sleep] Total calculated:', totalHours.toFixed(1), 'hours from', filteredSamples.length, 'samples');
+    return totalHours;
   } catch (err: any) {
     console.error('❌ Error getting sleep:', err);
     return 0;
@@ -408,12 +444,13 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples uses limit parameter
+    // API: queryQuantitySamples uses date range for accurate filtering
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         {
-          limit: 100, // Get up to 100 samples
+          from: from,
+          to: to,
         }
       );
 
@@ -503,14 +540,27 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     let results: any[] = [];
 
     // Query workouts using Kingstinct API
-    // API: queryWorkouts({ limit }) - returns workout objects with duration
+    // API: queryWorkouts({ from, to }) - returns workout objects with duration
     if (typeof module.queryWorkouts === 'function') {
+      const from = new Date(date);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(date);
+      to.setHours(23, 59, 59, 999);
+      
       results = await module.queryWorkouts({
-        limit: 100, // Get up to 100 workouts
+        from: from,
+        to: to,
       });
     }
 
+    console.log('💪 [Workouts] Raw response:', {
+      isArray: Array.isArray(results),
+      length: results?.length,
+      firstSample: results?.[0] ? JSON.stringify(results[0]).substring(0, 200) : 'none',
+    });
+
     if (!results || results.length === 0) {
+      console.log('💪 [Workouts] No workouts found');
       return 0;
     }
 
@@ -520,21 +570,23 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const totalMinutes = results
-      .filter((workout: any) => {
-        const workoutDate = new Date(workout?.startDate || workout?.date || 0);
-        return workoutDate >= dayStart && workoutDate <= dayEnd;
-      })
-      .reduce((sum: number, workout: any) => {
-        // Get workout duration in minutes
-        const start = new Date(workout.startDate).getTime();
-        const end = new Date(workout.endDate).getTime();
-        const durationMs = end - start;
-        const durationMinutes = durationMs / (1000 * 60);
-        return sum + durationMinutes;
-      }, 0);
+    const filteredWorkouts = results.filter((workout: any) => {
+      const workoutDate = new Date(workout?.startDate || workout?.date || 0);
+      return workoutDate >= dayStart && workoutDate <= dayEnd;
+    });
+    
+    console.log('💪 [Workouts] Filtered workouts:', filteredWorkouts.length);
 
-    console.log('💪 [Workouts] Total minutes:', totalMinutes);
+    const totalMinutes = filteredWorkouts.reduce((sum: number, workout: any) => {
+      // Get workout duration in minutes
+      const start = new Date(workout.startDate).getTime();
+      const end = new Date(workout.endDate).getTime();
+      const durationMs = end - start;
+      const durationMinutes = durationMs / (1000 * 60);
+      return sum + durationMinutes;
+    }, 0);
+
+    console.log('💪 [Workouts] Total minutes:', totalMinutes, 'from', filteredWorkouts.length, 'workouts');
     return Math.round(totalMinutes);
   } catch (err: any) {
     console.error('❌ Error getting workouts:', err);
@@ -559,15 +611,28 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     // Query stand hours using Kingstinct API
     // API: queryCategorySamples for HKCategoryTypeIdentifierAppleStandHour
     if (typeof module.queryCategorySamples === 'function') {
+      const from = new Date(date);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(date);
+      to.setHours(23, 59, 59, 999);
+      
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierAppleStandHour',
         {
-          limit: 100, // Get up to 100 stand hour samples
+          from: from,
+          to: to,
         }
       );
     }
 
+    console.log('⏰ [Stand Hours] Raw response:', {
+      isArray: Array.isArray(results),
+      length: results?.length,
+      firstSample: results?.[0] ? JSON.stringify(results[0]).substring(0, 200) : 'none',
+    });
+
     if (!results || results.length === 0) {
+      console.log('⏰ [Stand Hours] No samples found');
       return 0;
     }
 
@@ -577,14 +642,14 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const standHours = results
-      .filter((sample: any) => {
-        const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-        return sampleDate >= dayStart && sampleDate <= dayEnd;
-      })
-      .length; // Each sample represents 1 stand hour
+    const filteredSamples = results.filter((sample: any) => {
+      const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+      return sampleDate >= dayStart && sampleDate <= dayEnd;
+    });
+    
+    const standHours = filteredSamples.length; // Each sample represents 1 stand hour
 
-    console.log('⏰ [Stand Hours] Total hours stood:', standHours);
+    console.log('⏰ [Stand Hours] Total hours stood:', standHours, 'from', filteredSamples.length, 'samples');
     return standHours;
   } catch (err: any) {
     console.error('❌ Error getting stand hours:', err);

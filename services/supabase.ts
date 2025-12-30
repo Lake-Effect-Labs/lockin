@@ -211,7 +211,7 @@ export interface WeeklyScore {
   sleep_hours: number;
   calories: number;
   workouts: number;
-  standHours: number;
+  stand_hours: number;
   distance: number;
   total_points: number;
   last_synced_at: string;
@@ -684,7 +684,7 @@ export async function upsertWeeklyScore(
     sleep_hours: number;
     calories: number;
     workouts: number;
-    standHours: number;
+    standHours?: number;
     distance: number;
   }
 ): Promise<WeeklyScore> {
@@ -694,7 +694,12 @@ export async function upsertWeeklyScore(
       league_id: leagueId,
       user_id: userId,
       week_number: weekNumber,
-      ...metrics,
+      steps: metrics.steps,
+      sleep_hours: metrics.sleep_hours,
+      calories: metrics.calories,
+      workouts: metrics.workouts,
+      stand_hours: metrics.standHours || 0,
+      distance: metrics.distance,
       last_synced_at: new Date().toISOString(),
     }, {
       onConflict: 'league_id,user_id,week_number',

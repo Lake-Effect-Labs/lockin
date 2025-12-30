@@ -90,12 +90,6 @@ export function MatchupCard({
           <Text style={[styles.score, { color: myScoreColor }]}>
             {myScore.toFixed(1)}
           </Text>
-          {!compact && userScore && (
-            <View style={styles.miniStats}>
-              <Text style={styles.miniStat}>👟 {userScore.steps.toLocaleString()}</Text>
-              <Text style={styles.miniStat}>🔥 {userScore.calories}</Text>
-            </View>
-          )}
         </View>
         
         {/* VS Divider */}
@@ -144,12 +138,6 @@ export function MatchupCard({
           <Text style={[styles.score, { color: theirScoreColor }]}>
             {theirScore.toFixed(1)}
           </Text>
-          {!compact && opponentScore && (
-            <View style={styles.miniStats}>
-              <Text style={styles.miniStat}>👟 {opponentScore.steps.toLocaleString()}</Text>
-              <Text style={styles.miniStat}>🔥 {opponentScore.calories}</Text>
-            </View>
-          )}
         </View>
       </View>
     </LinearGradient>

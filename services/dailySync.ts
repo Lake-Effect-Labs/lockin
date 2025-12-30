@@ -171,6 +171,7 @@ export async function syncWeeklyToLeagues(userId: string): Promise<void> {
           sleep_hours: weeklyMetrics.sleepHours,
           calories: weeklyMetrics.calories,
           workouts: weeklyMetrics.workouts,
+          standHours: weeklyMetrics.standHours || 0,
           distance: weeklyMetrics.distance,
         }
       );

@@ -173,6 +173,7 @@ async function performBackgroundSync(): Promise<BackgroundSyncResult> {
           sleep_hours: leagueMetrics.sleepHours,
           calories: leagueMetrics.calories,
           workouts: leagueMetrics.workouts,
+          standHours: leagueMetrics.standHours || 0,
           distance: leagueMetrics.distance,
         }
       );

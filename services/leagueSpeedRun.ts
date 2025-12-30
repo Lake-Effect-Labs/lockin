@@ -228,6 +228,7 @@ export async function runLeagueSpeedRun(
           sleep_hours: metrics.sleepHours,
           calories: metrics.calories,
           workouts: metrics.workouts,
+          standHours: metrics.standHours || 0,
           distance: metrics.distance,
         });
       }
