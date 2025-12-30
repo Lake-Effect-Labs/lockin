@@ -285,11 +285,11 @@ export async function getLeagueDashboard(
   const isPlayoffs = league.playoffs_started;
   
   // Get current matchup
-  let currentMatchup = allMatchups.find(
-    m => m.week_number === currentWeek && 
+  const currentMatchup = allMatchups.find(
+    m => m.week_number === currentWeek &&
     (m.player1_id === userId || m.player2_id === userId)
   ) || null;
-  
+
   // Get weekly scores
   let userScore: WeeklyScore | null = null;
   let opponentScore: WeeklyScore | null = null;
@@ -297,10 +297,11 @@ export async function getLeagueDashboard(
   if (currentMatchup) {
     try {
       const isPlayer1 = currentMatchup.player1_id === userId;
-      const opponentId = isPlayer1 
-        ? currentMatchup.player2_id 
+      const opponentId = isPlayer1
+        ? currentMatchup.player2_id
         : currentMatchup.player1_id;
-      
+
+
       [userScore, opponentScore] = await Promise.all([
         getWeeklyScore(leagueId, userId, currentWeek).catch(() => null),
         getWeeklyScore(leagueId, opponentId, currentWeek).catch(() => null),

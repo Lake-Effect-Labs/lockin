@@ -16,6 +16,10 @@ export const DEFAULT_SCORING_CONFIG = {
 // Legacy export for backwards compatibility
 export const SCORING_CONFIG = DEFAULT_SCORING_CONFIG;
 
+// Valid league sizes
+export const VALID_LEAGUE_SIZES = [4, 6, 8, 10, 12, 14] as const;
+export type ValidLeagueSize = typeof VALID_LEAGUE_SIZES[number];
+
 // Scoring config type
 export interface ScoringConfig {
   points_per_1000_steps?: number;
@@ -27,18 +31,66 @@ export interface ScoringConfig {
 }
 
 /**
+ * Sanitize a scoring config value to be a valid positive number
+ */
+export function sanitizeScoringValue(value: unknown, defaultValue: number): number {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return defaultValue;
+  }
+  // Cap at 100 points max per unit
+  return Math.min(100, Math.max(0, Math.round(num)));
+}
+
+/**
+ * Sanitize an entire scoring config
+ */
+export function sanitizeScoringConfig(config: ScoringConfig | null | undefined): ScoringConfig {
+  if (!config) return {};
+
+  return {
+    points_per_1000_steps: sanitizeScoringValue(config.points_per_1000_steps, DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS),
+    points_per_sleep_hour: sanitizeScoringValue(config.points_per_sleep_hour, DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR),
+    points_per_100_active_cal: sanitizeScoringValue(config.points_per_100_active_cal, DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL),
+    points_per_workout: sanitizeScoringValue(config.points_per_workout, DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE),
+    points_per_stand_hour: sanitizeScoringValue(config.points_per_stand_hour, DEFAULT_SCORING_CONFIG.POINTS_PER_STAND_HOUR),
+    points_per_mile: sanitizeScoringValue(config.points_per_mile, DEFAULT_SCORING_CONFIG.POINTS_PER_MILE),
+  };
+}
+
+/**
+ * Sanitize fitness metrics to handle NaN, Infinity, and unreasonable values
+ */
+export function sanitizeMetrics(metrics: Partial<FitnessMetrics>): FitnessMetrics {
+  const sanitizeNumber = (val: unknown, max: number): number => {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return 0;
+    return Math.max(0, Math.min(max, num));
+  };
+
+  return {
+    steps: Math.round(sanitizeNumber(metrics.steps, 200000)),      // Max 200k steps/day
+    sleepHours: sanitizeNumber(metrics.sleepHours, 24),            // Max 24 hrs
+    calories: Math.round(sanitizeNumber(metrics.calories, 10000)), // Max 10k cal
+    workouts: Math.round(sanitizeNumber(metrics.workouts, 480)),   // Max 480 mins (8 hrs) workout/day
+    standHours: sanitizeNumber(metrics.standHours, 24),            // Max 24 stand hours/day
+    distance: sanitizeNumber(metrics.distance, 100),               // Max 100 miles/day
+  };
+}
+
+/**
  * Get scoring config from league or use defaults
  */
 export function getScoringConfig(leagueConfig?: ScoringConfig | null): typeof DEFAULT_SCORING_CONFIG {
   if (!leagueConfig) return DEFAULT_SCORING_CONFIG;
-  
+
   return {
-    POINTS_PER_1000_STEPS: (leagueConfig.points_per_1000_steps ?? DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS) as 1,
-    POINTS_PER_SLEEP_HOUR: (leagueConfig.points_per_sleep_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR) as 2,
-    POINTS_PER_100_ACTIVE_CAL: (leagueConfig.points_per_100_active_cal ?? DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL) as 5,
-    POINTS_PER_WORKOUT_MINUTE: (leagueConfig.points_per_workout ?? DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE) as 0.2,
-    POINTS_PER_STAND_HOUR: (leagueConfig.points_per_stand_hour ?? DEFAULT_SCORING_CONFIG.POINTS_PER_STAND_HOUR) as 5,
-    POINTS_PER_MILE: (leagueConfig.points_per_mile ?? DEFAULT_SCORING_CONFIG.POINTS_PER_MILE) as 3,
+    POINTS_PER_1000_STEPS: sanitizeScoringValue(leagueConfig.points_per_1000_steps, DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS) as 1,
+    POINTS_PER_SLEEP_HOUR: sanitizeScoringValue(leagueConfig.points_per_sleep_hour, DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR) as 2,
+    POINTS_PER_100_ACTIVE_CAL: sanitizeScoringValue(leagueConfig.points_per_100_active_cal, DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL) as 5,
+    POINTS_PER_WORKOUT_MINUTE: sanitizeScoringValue(leagueConfig.points_per_workout, DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE) as 0.2,
+    POINTS_PER_STAND_HOUR: sanitizeScoringValue(leagueConfig.points_per_stand_hour, DEFAULT_SCORING_CONFIG.POINTS_PER_STAND_HOUR) as 5,
+    POINTS_PER_MILE: sanitizeScoringValue(leagueConfig.points_per_mile, DEFAULT_SCORING_CONFIG.POINTS_PER_MILE) as 3,
   };
 }
 
@@ -114,17 +166,16 @@ export function sanitizeMetrics(metrics: FitnessMetrics): FitnessMetrics {
  */
 export function calculatePoints(metrics: FitnessMetrics, config?: typeof DEFAULT_SCORING_CONFIG): number {
   const scoringConfig = config || DEFAULT_SCORING_CONFIG;
-  
   // Sanitize inputs - handles NaN, Infinity, negative values, and caps
   const safe = sanitizeMetrics(metrics);
-  
+
   const stepsPoints = (safe.steps / 1000) * scoringConfig.POINTS_PER_1000_STEPS;
   const sleepPoints = safe.sleepHours * scoringConfig.POINTS_PER_SLEEP_HOUR;
   const caloriesPoints = (safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL;
   const workoutsPoints = safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE;
   const standHoursPoints = safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR;
   const distancePoints = safe.distance * scoringConfig.POINTS_PER_MILE;
-  
+
   return Math.round((stepsPoints + sleepPoints + caloriesPoints + workoutsPoints + standHoursPoints + distancePoints) * 100) / 100;
 }
 
@@ -136,17 +187,16 @@ export function calculatePoints(metrics: FitnessMetrics, config?: typeof DEFAULT
  */
 export function getPointsBreakdown(metrics: FitnessMetrics, config?: typeof DEFAULT_SCORING_CONFIG): PointsBreakdown {
   const scoringConfig = config || DEFAULT_SCORING_CONFIG;
-  
   // Sanitize inputs - handles NaN, Infinity, negative values, and caps
   const safe = sanitizeMetrics(metrics);
-  
+
   const stepsPoints = Math.round((safe.steps / 1000) * scoringConfig.POINTS_PER_1000_STEPS * 100) / 100;
   const sleepPoints = Math.round(safe.sleepHours * scoringConfig.POINTS_PER_SLEEP_HOUR * 100) / 100;
   const caloriesPoints = Math.round((safe.calories / 100) * scoringConfig.POINTS_PER_100_ACTIVE_CAL * 100) / 100;
   const workoutsPoints = Math.round(safe.workouts * scoringConfig.POINTS_PER_WORKOUT_MINUTE * 100) / 100;
   const standHoursPoints = Math.round(safe.standHours * scoringConfig.POINTS_PER_STAND_HOUR * 100) / 100;
   const distancePoints = Math.round(safe.distance * scoringConfig.POINTS_PER_MILE * 100) / 100;
-  
+
   return {
     stepsPoints,
     sleepPoints,

@@ -32,7 +32,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
 import { colors } from '@/utils/colors';
-import { DEFAULT_SCORING_CONFIG, getScoringRules } from '@/services/scoring';
+import { DEFAULT_SCORING_CONFIG, getScoringRules, sanitizeScoringConfig, sanitizeScoringValue } from '@/services/scoring';
 
 // ============================================
 // CREATE LEAGUE SCREEN
@@ -98,7 +98,8 @@ export default function CreateLeagueScreen() {
     }
     
     try {
-      const config = useDefaultScoring ? null : scoringConfig;
+      // Sanitize scoring config before sending to API
+      const config = useDefaultScoring ? null : sanitizeScoringConfig(scoringConfig);
       const league = await createLeague(trimmedName, seasonLength, user.id, maxPlayers, config);
       setCreatedLeague({ id: league.id, name: league.name, join_code: league.join_code });
     } catch (err: any) {
@@ -368,85 +369,85 @@ Join Code: ${joinCode}`;
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>👟 Steps</Text>
-                      <Text style={styles.scoringInputHint}>Points per 1,000 steps</Text>
+                      <Text style={styles.scoringInputHint}>Points per 1,000 steps (0-100)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_1000_steps.toString()}
                       onChangeText={(text) => {
-                        const val = parseInt(text) || 0;
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS);
                         setScoringConfig({ ...scoringConfig, points_per_1000_steps: val });
                       }}
                       keyboardType="numeric"
                       placeholder="1"
                     />
                   </View>
-                  
+
                   {/* Sleep */}
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>😴 Sleep</Text>
-                      <Text style={styles.scoringInputHint}>Points per hour</Text>
+                      <Text style={styles.scoringInputHint}>Points per hour (0-100)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_sleep_hour.toString()}
                       onChangeText={(text) => {
-                        const val = parseInt(text) || 0;
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR);
                         setScoringConfig({ ...scoringConfig, points_per_sleep_hour: val });
                       }}
                       keyboardType="numeric"
                       placeholder="2"
                     />
                   </View>
-                  
+
                   {/* Calories */}
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>🔥 Calories</Text>
-                      <Text style={styles.scoringInputHint}>Points per 100 active cal</Text>
+                      <Text style={styles.scoringInputHint}>Points per 100 cal (0-100)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_100_active_cal.toString()}
                       onChangeText={(text) => {
-                        const val = parseInt(text) || 0;
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL);
                         setScoringConfig({ ...scoringConfig, points_per_100_active_cal: val });
                       }}
                       keyboardType="numeric"
                       placeholder="5"
                     />
                   </View>
-                  
+
                   {/* Workouts */}
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>💪 Workouts</Text>
-                      <Text style={styles.scoringInputHint}>Points per workout</Text>
+                      <Text style={styles.scoringInputHint}>Points per workout (0-100)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_workout.toString()}
                       onChangeText={(text) => {
-                        const val = parseInt(text) || 0;
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT);
                         setScoringConfig({ ...scoringConfig, points_per_workout: val });
                       }}
                       keyboardType="numeric"
                       placeholder="20"
                     />
                   </View>
-                  
+
                   {/* Distance */}
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>🏃 Distance</Text>
-                      <Text style={styles.scoringInputHint}>Points per mile</Text>
+                      <Text style={styles.scoringInputHint}>Points per mile (0-100)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_mile.toString()}
                       onChangeText={(text) => {
-                        const val = parseInt(text) || 0;
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_MILE);
                         setScoringConfig({ ...scoringConfig, points_per_mile: val });
                       }}
                       keyboardType="numeric"
