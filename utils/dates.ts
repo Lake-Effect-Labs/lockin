@@ -297,6 +297,15 @@ export function getWeekDates(startDate: Date = getStartOfWeek()): Date[] {
 }
 
 /**
+ * Check if today is Sunday (Results Day)
+ * On Sunday, users can view final scores but no new scoring happens
+ */
+export function isResultsDay(): boolean {
+  const today = new Date();
+  return today.getDay() === 0; // 0 = Sunday
+}
+
+/**
  * Format day of week
  */
 export function formatDayOfWeek(date: Date, format: 'short' | 'long' = 'short'): string {

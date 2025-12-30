@@ -44,7 +44,7 @@ export default function MatchupScreen() {
     );
   }
   
-  const { currentMatchup, userScore, opponentScore, league, daysRemaining } = currentDashboard;
+  const { currentMatchup, userScore, opponentScore, league, daysRemaining, isResultsDay } = currentDashboard;
   
   const isPlayer1 = currentMatchup.player1_id === user?.id;
   const opponent = isPlayer1 ? currentMatchup.player2 : currentMatchup.player1;
@@ -102,16 +102,30 @@ export default function MatchupScreen() {
         
         {/* Status Banner */}
         <View style={styles.statusBanner}>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
-          </View>
-          <Text style={styles.countdown}>
-            {daysRemaining === 0 
-              ? 'Week ends today!' 
-              : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`
-            }
-          </Text>
+          {isResultsDay ? (
+            <>
+              <View style={styles.resultsBadge}>
+                <Ionicons name="trophy" size={16} color={colors.primary[500]} />
+                <Text style={styles.resultsText}>RESULTS DAY</Text>
+              </View>
+              <Text style={styles.countdown}>
+                Final scores • New week starts Monday
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+              <Text style={styles.countdown}>
+                {daysRemaining === 0 
+                  ? 'Week ends today!' 
+                  : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`
+                }
+              </Text>
+            </>
+          )}
         </View>
         
         {/* Main Matchup Card */}
@@ -342,6 +356,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.status.error,
+    letterSpacing: 1,
+  },
+  resultsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  resultsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary[500],
     letterSpacing: 1,
   },
   countdown: {

@@ -57,6 +57,7 @@ export interface LeagueDashboard {
   isPlayoffs: boolean;
   playoffBracket: PlayoffBracket | null;
   isAdmin: boolean;
+  isResultsDay: boolean; // Sunday - view results, no scoring
 }
 
 /**
@@ -351,6 +352,10 @@ export async function getLeagueDashboard(
   // Check if user is admin (creator is always admin)
   const isAdmin = league.created_by === userId;
   
+  // Check if it's Results Day (Sunday)
+  const { isResultsDay } = require('../utils/dates');
+  const isResultsDayToday = isResultsDay();
+  
   return {
     league,
     members: standings,
@@ -362,6 +367,7 @@ export async function getLeagueDashboard(
     isPlayoffs,
     playoffBracket: playoffBracket || null,
     isAdmin,
+    isResultsDay: isResultsDayToday,
   };
 }
 
@@ -499,11 +505,13 @@ export function isLeagueCreator(league: League, userId: string): boolean {
 
 /**
  * Calculate days remaining in the current week
+ * Scoring period: Monday-Saturday (6 days)
+ * Sunday is results day, not part of scoring
  */
 function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: number): number {
-  if (!startDate) return 7;
+  if (!startDate) return 6;
   
-  // startDate should be a Monday, and weeks run Monday-Sunday
+  // startDate should be a Monday, and scoring weeks run Monday-Saturday
   const start = new Date(startDate);
   
   // Calculate the start of the current week (Monday)
@@ -511,9 +519,9 @@ function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: num
   // Week N starts on startDate + (N-1) * 7 days
   const weekStart = new Date(start.getTime() + ((currentWeek - 1) * 7 * 24 * 60 * 60 * 1000));
   
-  // Week ends on Sunday (6 days after Monday)
+  // Scoring week ends on Saturday (5 days after Monday)
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setDate(weekStart.getDate() + 5);
   weekEnd.setHours(23, 59, 59, 999);
   
   const now = new Date();
@@ -534,9 +542,11 @@ export function formatCountdown(daysRemaining: number): string {
 
 /**
  * Get week date range
+ * Scoring period: Monday 00:00 - Saturday 23:59 (6 days)
+ * Results day: Sunday (view results, see next opponent)
  */
 export function getWeekDateRange(startDate: string | null, weekNumber: number): { start: Date; end: Date } {
-  // startDate should be a Monday, and weeks run Monday-Sunday
+  // startDate should be a Monday, and weeks run Monday-Saturday for scoring
   let start: Date;
   
   if (startDate) {
@@ -552,9 +562,10 @@ export function getWeekDateRange(startDate: string | null, weekNumber: number): 
   const weekStart = new Date(start.getTime() + ((weekNumber - 1) * 7 * 24 * 60 * 60 * 1000));
   weekStart.setHours(0, 0, 0, 0);
   
-  // Week ends on Sunday (6 days after Monday)
+  // Scoring week ends on Saturday (5 days after Monday, not 6)
+  // Sunday is results day, not part of scoring period
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setDate(weekStart.getDate() + 5);
   weekEnd.setHours(23, 59, 59, 999);
   
   return { start: weekStart, end: weekEnd };

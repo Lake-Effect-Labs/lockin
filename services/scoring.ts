@@ -117,46 +117,6 @@ export interface PointsBreakdown {
 // SANITIZATION & VALIDATION
 // ============================================
 
-/**
- * Sanitization caps to prevent unrealistic values
- * (e.g., 50,000 steps = 25 miles of walking)
- */
-const SANITIZATION_CAPS = {
-  MAX_STEPS: 100000, // ~47 miles/day (humanly possible)
-  MAX_SLEEP_HOURS: 24, // can't sleep more than 24 hours
-  MAX_CALORIES: 10000, // ~5x average daily burn
-  MAX_WORKOUT_MINUTES: 1440, // can't exercise more than 24 hours/day (1440 minutes)
-  MAX_STAND_HOURS: 16, // can't stand more than 16 hours/day (need sleep)
-  MAX_DISTANCE: 150, // ~ultra-marathon distance
-} as const;
-
-/**
- * Sanitize fitness metrics - handles NaN, Infinity, negative, and unrealistic values
- * @param metrics - Raw fitness metrics (may contain invalid values)
- * @returns Sanitized metrics with values capped and normalized
- */
-export function sanitizeMetrics(metrics: FitnessMetrics): FitnessMetrics {
-  const sanitize = (value: any, max: number): number => {
-    // Convert to number, handle NaN/Infinity/null/undefined
-    const num = Number(value);
-    if (!isFinite(num)) return 0;
-    
-    // No negative values
-    if (num < 0) return 0;
-    
-    // Cap at maximum
-    return Math.min(num, max);
-  };
-
-  return {
-    steps: sanitize(metrics.steps, SANITIZATION_CAPS.MAX_STEPS),
-    sleepHours: sanitize(metrics.sleepHours, SANITIZATION_CAPS.MAX_SLEEP_HOURS),
-    calories: sanitize(metrics.calories, SANITIZATION_CAPS.MAX_CALORIES),
-    workouts: sanitize(metrics.workouts, SANITIZATION_CAPS.MAX_WORKOUT_MINUTES),
-    standHours: sanitize(metrics.standHours, SANITIZATION_CAPS.MAX_STAND_HOURS),
-    distance: sanitize(metrics.distance, SANITIZATION_CAPS.MAX_DISTANCE),
-  };
-}
 
 /**
  * Calculate total points from fitness metrics
@@ -294,7 +254,7 @@ export function getScoringRules(config?: typeof DEFAULT_SCORING_CONFIG): { metri
     },
     {
       metric: 'Workouts',
-      rule: `${scoringConfig.POINTS_PER_WORKOUT} points per workout`,
+      rule: `${scoringConfig.POINTS_PER_WORKOUT_MINUTE} points per minute`,
       icon: '💪',
     },
     {
