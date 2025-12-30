@@ -239,8 +239,8 @@ export default function HomeScreen() {
                     onPress={() => router.push(`/(app)/league/${league.id}`)}
                     style={styles.leagueCard}
                   />
-                  {/* Ad Banner - Middle of leagues list */}
-                  {index === Math.floor(leagues.length / 2) - 1 && (
+                  {/* Ad Banner - Middle of leagues list (only show if 2+ leagues) */}
+                  {leagues.length >= 2 && index === Math.floor(leagues.length / 2) - 1 && (
                     <SmartAdBanner placement="home" />
                   )}
                 </React.Fragment>
