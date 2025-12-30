@@ -261,11 +261,12 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     // API: queryQuantitySamples(typeIdentifier, { from, to }) - use date range for accurate filtering
     if (typeof module.queryQuantitySamples === 'function') {
       // Query samples with date range to get only today's data
+      // Library expects timestamps (milliseconds) based on error "expected a number"
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          from: from.toISOString(),
-          to: to.toISOString(),
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
@@ -363,8 +364,8 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       results = await module.queryQuantitySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          from: from.toISOString(),
-          to: to.toISOString(),
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
     }
@@ -449,8 +450,8 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         {
-          from: from.toISOString(),
-          to: to.toISOString(),
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
@@ -506,7 +507,7 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
-        { from: from.toISOString(), to: to.toISOString() }
+        { from: from.getTime(), to: to.getTime() }
       );
 
       // Sum all distance samples for the day
@@ -904,7 +905,7 @@ export async function getHealthDiagnosticReport(): Promise<{
 
       const rawSamples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        { from: from.toISOString(), to: to.toISOString() }
+        { from: from.getTime(), to: to.getTime() }
       );
 
       if (rawSamples && rawSamples.length > 0) {
