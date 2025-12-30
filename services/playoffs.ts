@@ -191,12 +191,21 @@ function createPlaceholderUser(id: string): User {
 
 /**
  * Check if playoffs should start
+ * @param currentWeek - The current week number
+ * @param seasonLength - Total weeks in the regular season
+ * @param playoffsStarted - Whether playoffs have already started
+ * @param playerCount - Optional: Number of players in the league (need at least 4)
  */
 export function shouldStartPlayoffs(
   currentWeek: number,
   seasonLength: number,
-  playoffsStarted: boolean
+  playoffsStarted: boolean,
+  playerCount?: number
 ): boolean {
+  // Need at least 4 players for playoffs
+  if (playerCount !== undefined && playerCount < 4) {
+    return false;
+  }
   return currentWeek > seasonLength && !playoffsStarted;
 }
 
