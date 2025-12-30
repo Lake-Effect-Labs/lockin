@@ -264,8 +264,8 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          from: from,
-          to: to,
+          from: from.toISOString(),
+          to: to.toISOString(),
         }
       );
 
@@ -363,8 +363,8 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       results = await module.queryQuantitySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          from: from,
-          to: to,
+          from: from.toISOString(),
+          to: to.toISOString(),
         }
       );
     }
@@ -449,8 +449,8 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         {
-          from: from,
-          to: to,
+          from: from.toISOString(),
+          to: to.toISOString(),
         }
       );
 
@@ -506,7 +506,7 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     if (typeof module.queryQuantitySamples === 'function') {
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
-        { from, to }
+        { from: from.toISOString(), to: to.toISOString() }
       );
 
       // Sum all distance samples for the day
@@ -904,7 +904,7 @@ export async function getHealthDiagnosticReport(): Promise<{
 
       const rawSamples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        { from, to }
+        { from: from.toISOString(), to: to.toISOString() }
       );
 
       if (rawSamples && rawSamples.length > 0) {
