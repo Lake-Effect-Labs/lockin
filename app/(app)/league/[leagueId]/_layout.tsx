@@ -20,6 +20,7 @@ export default function LeagueLayout() {
       <Stack.Screen name="matchup" />
       <Stack.Screen name="standings" />
       <Stack.Screen name="playoffs" />
+      <Stack.Screen name="allMatchups" />
     </Stack>
   );
 }
