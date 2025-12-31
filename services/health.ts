@@ -255,6 +255,7 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     to.setHours(23, 59, 59, 999);
 
     console.log('📊 [Steps] Query:', {
+      requestedDate: date.toISOString(),
       from: from.toISOString(),
       to: to.toISOString(),
       fromMs: from.getTime(),
@@ -273,6 +274,7 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
               endDate: to,
             },
           },
+          limit: 1000, // Set a reasonable limit instead of relying on default
         }
       );
 
@@ -281,15 +283,30 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
         length: samples?.length,
         firstSample: samples?.[0] ? JSON.stringify(samples[0]) : 'none',
         sampleKeys: samples?.[0] ? Object.keys(samples[0]) : [],
+        allSamples: samples ? samples.map((s: any) => ({ 
+          quantity: s?.quantity, 
+          startDate: s?.startDate?.toString().substring(0, 24),
+          endDate: s?.endDate?.toString().substring(0, 24)
+        })) : [],
       });
 
       // Sum all samples (filtered by date)
       if (samples && Array.isArray(samples) && samples.length > 0) {
         console.log('📊 [Steps] Processing', samples.length, 'samples');
         
+        // Log each sample's quantity
+        samples.forEach((sample: any, index: number) => {
+          console.log(`📊 [Steps] Sample ${index}:`, {
+            quantity: sample?.quantity,
+            unit: sample?.unit,
+            startDate: sample?.startDate?.toString().substring(0, 24),
+          });
+        });
+        
         const total = samples.reduce((sum: number, sample: any) => {
           // Kingstinct library uses 'quantity' property
           const value = sample?.quantity ?? 0;
+          console.log(`📊 [Steps] Adding ${value} to sum (current: ${sum})`);
           return sum + value;
         }, 0);
         
@@ -959,13 +976,13 @@ export async function getHealthDiagnosticReport(): Promise<{
       const rawSamples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          limit: -1,
           filter: {
             date: {
               startDate: from,
               endDate: to,
             },
           },
+          limit: 100,
         }
       );
 

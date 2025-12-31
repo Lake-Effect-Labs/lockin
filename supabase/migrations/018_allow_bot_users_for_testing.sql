@@ -50,6 +50,27 @@ CREATE POLICY "Users can update own profile or bot users" ON users
     );
 
 -- ============================================
+-- FIX LEAGUE_MEMBERS RLS POLICIES
+-- ============================================
+
+-- Allow bot users to be added to leagues
+DROP POLICY IF EXISTS "Users can join leagues" ON league_members;
+DROP POLICY IF EXISTS "Users can join leagues or add bot users" ON league_members;
+
+CREATE POLICY "Users can join leagues or add bot users" ON league_members
+    FOR INSERT WITH CHECK (
+        -- User joining a league themselves
+        auth.uid() = user_id
+        OR
+        -- Allow adding bot users (check if user exists in users table with bot email)
+        EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = league_members.user_id
+            AND (users.email LIKE '%@speedrun.test' OR users.email LIKE '%@bot.test')
+        )
+    );
+
+-- ============================================
 -- NOTES
 -- ============================================
 
