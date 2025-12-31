@@ -1,0 +1,3 @@
+[submodule "vendor/react-native-healthkit"]
+	path = vendor/react-native-healthkit
+	url = https://github.com/kingstinct/react-native-healthkit.git
