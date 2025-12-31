@@ -441,15 +441,6 @@ Join Code: ${joinCode}`;
             <Ionicons name="list" size={18} color={colors.text.secondary} />
             <Text style={styles.tabText}>Standings</Text>
           </TouchableOpacity>
-          {isPlayoffs && (
-            <TouchableOpacity
-              style={styles.tab}
-              onPress={() => router.push(`/(app)/league/${leagueId}/playoffs`)}
-            >
-              <Ionicons name="trophy" size={18} color={colors.text.secondary} />
-              <Text style={styles.tabText}>Playoffs</Text>
-            </TouchableOpacity>
-          )}
         </View>
         
         {/* Current Matchup */}
