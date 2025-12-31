@@ -354,8 +354,8 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          from: from,
-          to: to,
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
     }
@@ -549,8 +549,8 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
       to.setHours(23, 59, 59, 999);
       
       results = await module.queryWorkouts({
-        from: from,
-        to: to,
+        from: from.getTime(),
+        to: to.getTime(),
       });
     }
 
@@ -620,8 +620,8 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierAppleStandHour',
         {
-          from: from,
-          to: to,
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
     }

@@ -105,14 +105,23 @@ export function getStartOfWeekMonday(date: Date = new Date()): Date {
 }
 
 /**
- * Get end of week (Sunday) - for leagues (Monday-Sunday weeks)
+ * Get end of week (Saturday) - for leagues (Monday-Saturday scoring weeks)
+ * Sunday is Results Day - view final scores and preview next opponent
  */
-export function getEndOfWeekSunday(date: Date = new Date()): Date {
+export function getEndOfWeekSaturday(date: Date = new Date()): Date {
   const weekStart = getStartOfWeekMonday(date);
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6); // Sunday is 6 days after Monday
+  weekEnd.setDate(weekStart.getDate() + 5); // Saturday is 5 days after Monday
   weekEnd.setHours(23, 59, 59, 999);
   return weekEnd;
+}
+
+/**
+ * Get end of week (Sunday) - DEPRECATED: Use getEndOfWeekSaturday
+ * Kept for backward compatibility
+ */
+export function getEndOfWeekSunday(date: Date = new Date()): Date {
+  return getEndOfWeekSaturday(date);
 }
 
 /**
@@ -247,6 +256,15 @@ export function isPast(date: Date | string): boolean {
 export function isFuture(date: Date | string): boolean {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d > new Date();
+}
+
+/**
+ * Check if today is Results Day (Sunday)
+ * Results Day is when users can view final matchup results and preview next opponent
+ * Scoring period is Mon-Sat, Sunday is for reviewing results
+ */
+export function isResultsDay(date: Date = new Date()): boolean {
+  return date.getDay() === 0; // 0 = Sunday
 }
 
 /**

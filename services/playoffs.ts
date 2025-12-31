@@ -36,7 +36,7 @@ export interface PlayoffMatchDisplay {
 
 /**
  * Get playoff qualifiers based on league size
- * All league sizes: top 4 qualify
+ * ALL league sizes (4, 6, 8, 10, 12, 14 players): top 4 qualify for playoffs
  */
 export function getPlayoffQualifiers(members: LeagueMember[], leagueSize?: number): LeagueMember[] {
   // Sort by wins (desc), then total points (desc)
@@ -44,27 +44,27 @@ export function getPlayoffQualifiers(members: LeagueMember[], leagueSize?: numbe
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.total_points - a.total_points;
   });
-  
-  // Always return top 4 for all league sizes
+
+  // All league sizes qualify top 4 players for playoffs
   const playoffSize = 4;
-  
+
   return sorted.slice(0, Math.min(playoffSize, sorted.length));
 }
 
 /**
- * Generate playoff matchups for any league size
- * All leagues: 2 semifinals (1v4, 2v3), 1 final
+ * Generate playoff matchups for 4 qualifiers
+ * Standard bracket: 2 semifinals (1vs4, 2vs3), then 1 final
  */
 export function generatePlayoffMatchups(qualifiers: LeagueMember[]): {
   semifinal1: { player1: LeagueMember; player2: LeagueMember };
   semifinal2: { player1: LeagueMember; player2: LeagueMember };
 } {
   const count = qualifiers.length;
-  
+
   if (count < 4) {
     throw new Error('Need at least 4 players for playoffs');
   }
-  
+
   // Standard 4-player bracket: 1vs4, 2vs3
   return {
     semifinal1: {
