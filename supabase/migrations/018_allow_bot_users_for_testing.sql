@@ -21,10 +21,28 @@ COMMENT ON TABLE users IS 'User profiles. Note: id does not reference auth.users
 -- Users can still only update their own profile
 -- But we allow inserting bot users (for testing) if they have a special email pattern
 DROP POLICY IF EXISTS "Users can insert own profile" ON users;
+DROP POLICY IF EXISTS "Users can insert own profile or bot users" ON users;
 
 CREATE POLICY "Users can insert own profile or bot users" ON users
     FOR INSERT WITH CHECK (
         -- User inserting their own profile
+        auth.uid() = id
+        OR
+        -- Allow bot users (email ends with @speedrun.test or @bot.test)
+        -- This allows ANY authenticated user to create bot users for testing
+        (email LIKE '%@speedrun.test' OR email LIKE '%@bot.test')
+        OR
+        -- Allow inserts from service role (for backend operations)
+        auth.jwt()->>'role' = 'service_role'
+    );
+
+-- Also update the UPDATE policy to match
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
+DROP POLICY IF EXISTS "Users can update own profile or bot users" ON users;
+
+CREATE POLICY "Users can update own profile or bot users" ON users
+    FOR UPDATE USING (
+        -- User updating their own profile
         auth.uid() = id
         OR
         -- Allow bot users (email ends with @speedrun.test or @bot.test)
