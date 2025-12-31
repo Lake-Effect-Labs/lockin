@@ -427,22 +427,20 @@ Join Code: ${joinCode}`;
             <Ionicons name="home" size={18} color={colors.primary[500]} />
             <Text style={[styles.tabText, styles.tabTextActive]}>Dashboard</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => router.push(`/(app)/league/${leagueId}/allMatchups`)}
+          >
+            <Ionicons name="people" size={18} color={colors.text.secondary} />
+            <Text style={styles.tabText}>Matchups</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.tab}
             onPress={() => router.push(`/(app)/league/${leagueId}/standings`)}
           >
             <Ionicons name="list" size={18} color={colors.text.secondary} />
             <Text style={styles.tabText}>Standings</Text>
           </TouchableOpacity>
-          {isPlayoffs && (
-            <TouchableOpacity 
-              style={styles.tab}
-              onPress={() => router.push(`/(app)/league/${leagueId}/playoffs`)}
-            >
-              <Ionicons name="trophy" size={18} color={colors.text.secondary} />
-              <Text style={styles.tabText}>Playoffs</Text>
-            </TouchableOpacity>
-          )}
         </View>
         
         {/* Current Matchup */}
