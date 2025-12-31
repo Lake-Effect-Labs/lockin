@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lock-In",
     "slug": "lock-in",
-    "version": "1.0.43",
+    "version": "1.0.44",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "lockin",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.lockin.app",
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In uses Health data to power fitness leagues and insights.",
         "NSHealthUpdateUsageDescription": "Lock-In writes workout data you log.",
