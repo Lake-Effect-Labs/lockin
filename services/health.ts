@@ -259,20 +259,15 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    // API: queryQuantitySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
+    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
       // Query samples with date range to get only today's data
-      // Library expects: limit (required), filter.date.startDate/endDate (Date objects)
+      // Library expects timestamps (milliseconds) for from/to
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          limit: -1, // -1 means fetch all samples
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
@@ -358,18 +353,13 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     console.log('😴 [Sleep] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API: queryCategorySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
+    // API: queryCategorySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
         {
-          limit: -1, // -1 means fetch all samples
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
     } else {
@@ -451,20 +441,15 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
+    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
       console.log('🔥 [Calories] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         {
-          limit: -1, // -1 means fetch all samples
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
@@ -473,12 +458,22 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
         first: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 100) : 'none',
       });
 
-      // Sum all samples - API already filtered by date
-      if (samples && Array.isArray(samples) && samples.length > 0) {
-        const total = samples.reduce((sum: number, sample: any) => {
-          const value = sample?.quantity ?? sample?.value ?? 0;
-          return sum + value;
-        }, 0);
+      // Filter samples for today and sum them
+      if (samples && Array.isArray(samples)) {
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const total = samples
+          .filter((sample: any) => {
+            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
+            return sampleDate >= dayStart && sampleDate <= dayEnd;
+          })
+          .reduce((sum: number, sample: any) => {
+            const value = sample?.quantity ?? sample?.value ?? 0;
+            return sum + value;
+          }, 0);
         console.log('🔥 [Calories] Total:', Math.round(total));
         return Math.round(total);
       }
@@ -512,20 +507,15 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     let totalMeters = 0;
 
     // For distance, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
+    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
       console.log('🏃 [Distance] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         {
-          limit: -1, // -1 means fetch all samples
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
@@ -535,7 +525,7 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
       });
 
       // Sum all distance samples for the day
-      if (samples && Array.isArray(samples) && samples.length > 0) {
+      if (samples && Array.isArray(samples)) {
         totalMeters = samples.reduce((sum: number, sample: any) => {
           const value = sample?.quantity ?? sample?.value ?? 0;
           return sum + value;
@@ -571,22 +561,17 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     console.log('💪 [Workouts] Querying:', { from: from.toISOString(), to: to.toISOString() });
-    console.log('💪 [Workouts] queryWorkoutSamples available:', typeof module.queryWorkoutSamples === 'function');
+    console.log('💪 [Workouts] queryWorkouts available:', typeof module.queryWorkouts === 'function');
 
     // Query workouts using Kingstinct API
-    // API: queryWorkoutSamples({ limit, filter: { date: { startDate, endDate } } })
-    if (typeof module.queryWorkoutSamples === 'function') {
-      results = await module.queryWorkoutSamples({
-        limit: -1, // -1 means fetch all samples
-        filter: {
-          date: {
-            startDate: from,
-            endDate: to,
-          },
-        },
+    // API: queryWorkouts({ from, to }) - use timestamps
+    if (typeof module.queryWorkouts === 'function') {
+      results = await module.queryWorkouts({
+        from: from.getTime(),
+        to: to.getTime(),
       });
     } else {
-      console.log('💪 [Workouts] queryWorkoutSamples not available, no fallback');
+      console.log('💪 [Workouts] queryWorkouts not available, no fallback');
     }
 
     console.log('💪 [Workouts] Raw response:', {
@@ -653,18 +638,13 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     console.log('⏰ [Stand Hours] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Query stand hours using Kingstinct API
-    // API: queryCategorySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
+    // API: queryCategorySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierAppleStandHour',
         {
-          limit: -1, // -1 means fetch all samples
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
     } else {
@@ -951,13 +931,8 @@ export async function getHealthDiagnosticReport(): Promise<{
       const rawSamples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
         {
-          limit: -1,
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
+          from: from.getTime(),
+          to: to.getTime(),
         }
       );
 
