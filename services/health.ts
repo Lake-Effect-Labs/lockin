@@ -259,16 +259,11 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
-      // Query samples with date range to get only today's data
-      // Library expects timestamps (milliseconds) for from/to
+      // Query ALL samples (no filter) - the API is rejecting our filter parameters
+      // We'll filter manually in JavaScript
       const samples = await module.queryQuantitySamples(
-        'HKQuantityTypeIdentifierStepCount',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKQuantityTypeIdentifierStepCount'
       );
 
       console.log('📊 [Steps] Raw response:', {
@@ -353,14 +348,10 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     console.log('😴 [Sleep] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API: queryCategorySamples(typeIdentifier, { from, to }) - use timestamps
+    // Query ALL samples (no filter) - the API is rejecting our filter parameters
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
-        'HKCategoryTypeIdentifierSleepAnalysis',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKCategoryTypeIdentifierSleepAnalysis'
       );
     } else {
       console.log('😴 [Sleep] queryCategorySamples not available');
@@ -441,16 +432,12 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
       console.log('🔥 [Calories] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
+      // Query ALL samples (no filter) - the API is rejecting our filter parameters
       const samples = await module.queryQuantitySamples(
-        'HKQuantityTypeIdentifierActiveEnergyBurned',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKQuantityTypeIdentifierActiveEnergyBurned'
       );
 
       console.log('🔥 [Calories] Response:', {
@@ -507,16 +494,12 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     let totalMeters = 0;
 
     // For distance, we need to SUM all samples (not just get the latest)
-    // API: queryQuantitySamples(typeIdentifier, { from, to }) - use timestamps
     if (typeof module.queryQuantitySamples === 'function') {
       console.log('🏃 [Distance] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
+      // Query ALL samples (no filter) - the API is rejecting our filter parameters
       const samples = await module.queryQuantitySamples(
-        'HKQuantityTypeIdentifierDistanceWalkingRunning',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKQuantityTypeIdentifierDistanceWalkingRunning'
       );
 
       console.log('🏃 [Distance] Response:', {
@@ -638,14 +621,10 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     console.log('⏰ [Stand Hours] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Query stand hours using Kingstinct API
-    // API: queryCategorySamples(typeIdentifier, { from, to }) - use timestamps
+    // Query ALL samples (no filter) - the API is rejecting our filter parameters
     if (typeof module.queryCategorySamples === 'function') {
       results = await module.queryCategorySamples(
-        'HKCategoryTypeIdentifierAppleStandHour',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKCategoryTypeIdentifierAppleStandHour'
       );
     } else {
       console.log('⏰ [Stand Hours] queryCategorySamples not available');
@@ -928,12 +907,9 @@ export async function getHealthDiagnosticReport(): Promise<{
       const to = new Date(now);
       to.setHours(23, 59, 59, 999);
 
+      // Query ALL samples (no filter) - the API is rejecting filter parameters
       const rawSamples = await module.queryQuantitySamples(
-        'HKQuantityTypeIdentifierStepCount',
-        {
-          from: from.getTime(),
-          to: to.getTime(),
-        }
+        'HKQuantityTypeIdentifierStepCount'
       );
 
       if (rawSamples && rawSamples.length > 0) {
@@ -1023,8 +999,7 @@ export async function getRawHealthDebug(): Promise<{
   // Test Steps
   try {
     const samples = await module.queryQuantitySamples(
-      'HKQuantityTypeIdentifierStepCount',
-      { from: from.getTime(), to: to.getTime() }
+      'HKQuantityTypeIdentifierStepCount'
     );
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1053,8 +1028,7 @@ export async function getRawHealthDebug(): Promise<{
   // Test Calories
   try {
     const samples = await module.queryQuantitySamples(
-      'HKQuantityTypeIdentifierActiveEnergyBurned',
-      { from: from.getTime(), to: to.getTime() }
+      'HKQuantityTypeIdentifierActiveEnergyBurned'
     );
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1083,8 +1057,7 @@ export async function getRawHealthDebug(): Promise<{
   // Test Distance
   try {
     const samples = await module.queryQuantitySamples(
-      'HKQuantityTypeIdentifierDistanceWalkingRunning',
-      { from: from.getTime(), to: to.getTime() }
+      'HKQuantityTypeIdentifierDistanceWalkingRunning'
     );
     const totalMeters = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1117,8 +1090,7 @@ export async function getRawHealthDebug(): Promise<{
     sleepFrom.setHours(18, 0, 0, 0);
 
     const samples = await module.queryCategorySamples(
-      'HKCategoryTypeIdentifierSleepAnalysis',
-      { from: sleepFrom.getTime(), to: to.getTime() }
+      'HKCategoryTypeIdentifierSleepAnalysis'
     );
 
     let totalMinutes = 0;
@@ -1191,8 +1163,7 @@ export async function getRawHealthDebug(): Promise<{
   // Test Stand Hours
   try {
     const samples = await module.queryCategorySamples(
-      'HKCategoryTypeIdentifierAppleStandHour',
-      { from: from.getTime(), to: to.getTime() }
+      'HKCategoryTypeIdentifierAppleStandHour'
     );
 
     queries.push({
