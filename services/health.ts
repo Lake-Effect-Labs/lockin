@@ -977,3 +977,247 @@ export async function getHealthDiagnosticReport(): Promise<{
     details: { moduleStatus, authStatus, dataStatus, todayData, rawSampleInfo, errors },
   };
 }
+
+/**
+ * Get RAW health data debug info for in-app display
+ * This captures the actual API responses so we can see what's happening
+ */
+export async function getRawHealthDebug(): Promise<{
+  timestamp: string;
+  queries: {
+    metric: string;
+    queryParams: string;
+    rawResponse: string;
+    sampleCount: number;
+    firstSample: string;
+    calculatedValue: number | string;
+    error: string | null;
+  }[];
+}> {
+  const module = getHealthKit();
+  const queries: any[] = [];
+  const now = new Date();
+
+  const from = new Date(now);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
+
+  const queryParams = `from: ${from.getTime()} (${from.toISOString()}), to: ${to.getTime()} (${to.toISOString()})`;
+
+  if (!module) {
+    return {
+      timestamp: now.toISOString(),
+      queries: [{
+        metric: 'MODULE',
+        queryParams: 'N/A',
+        rawResponse: 'HealthKit module not loaded!',
+        sampleCount: 0,
+        firstSample: 'N/A',
+        calculatedValue: 0,
+        error: 'Module failed to load',
+      }],
+    };
+  }
+
+  // Test Steps
+  try {
+    const samples = await module.queryQuantitySamples(
+      'HKQuantityTypeIdentifierStepCount',
+      { from: from.getTime(), to: to.getTime() }
+    );
+    const total = Array.isArray(samples)
+      ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
+      : 0;
+    queries.push({
+      metric: 'STEPS',
+      queryParams,
+      rawResponse: `Array(${samples?.length ?? 0})`,
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: Math.round(total),
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'STEPS',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  // Test Calories
+  try {
+    const samples = await module.queryQuantitySamples(
+      'HKQuantityTypeIdentifierActiveEnergyBurned',
+      { from: from.getTime(), to: to.getTime() }
+    );
+    const total = Array.isArray(samples)
+      ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
+      : 0;
+    queries.push({
+      metric: 'CALORIES',
+      queryParams,
+      rawResponse: `Array(${samples?.length ?? 0})`,
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: Math.round(total),
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'CALORIES',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  // Test Distance
+  try {
+    const samples = await module.queryQuantitySamples(
+      'HKQuantityTypeIdentifierDistanceWalkingRunning',
+      { from: from.getTime(), to: to.getTime() }
+    );
+    const totalMeters = Array.isArray(samples)
+      ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
+      : 0;
+    queries.push({
+      metric: 'DISTANCE',
+      queryParams,
+      rawResponse: `Array(${samples?.length ?? 0})`,
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: `${totalMeters.toFixed(0)}m = ${(totalMeters / 1609.34).toFixed(2)}mi`,
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'DISTANCE',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  // Test Sleep
+  try {
+    const sleepFrom = new Date(now);
+    sleepFrom.setDate(sleepFrom.getDate() - 1);
+    sleepFrom.setHours(18, 0, 0, 0);
+
+    const samples = await module.queryCategorySamples(
+      'HKCategoryTypeIdentifierSleepAnalysis',
+      { from: sleepFrom.getTime(), to: to.getTime() }
+    );
+
+    let totalMinutes = 0;
+    if (Array.isArray(samples)) {
+      samples.forEach((s: any) => {
+        const start = new Date(s.startDate).getTime();
+        const end = new Date(s.endDate).getTime();
+        totalMinutes += (end - start) / (1000 * 60);
+      });
+    }
+
+    queries.push({
+      metric: 'SLEEP',
+      queryParams: `from: ${sleepFrom.getTime()}, to: ${to.getTime()}`,
+      rawResponse: `Array(${samples?.length ?? 0})`,
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: `${(totalMinutes / 60).toFixed(1)} hrs`,
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'SLEEP',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  // Test Workouts
+  try {
+    const samples = await module.queryWorkouts?.({
+      from: from.getTime(),
+      to: to.getTime(),
+    });
+
+    let totalMinutes = 0;
+    if (Array.isArray(samples)) {
+      samples.forEach((s: any) => {
+        const start = new Date(s.startDate).getTime();
+        const end = new Date(s.endDate).getTime();
+        totalMinutes += (end - start) / (1000 * 60);
+      });
+    }
+
+    queries.push({
+      metric: 'WORKOUTS',
+      queryParams,
+      rawResponse: samples ? `Array(${samples?.length ?? 0})` : 'queryWorkouts not available',
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: `${Math.round(totalMinutes)} mins`,
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'WORKOUTS',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  // Test Stand Hours
+  try {
+    const samples = await module.queryCategorySamples(
+      'HKCategoryTypeIdentifierAppleStandHour',
+      { from: from.getTime(), to: to.getTime() }
+    );
+
+    queries.push({
+      metric: 'STAND_HOURS',
+      queryParams,
+      rawResponse: `Array(${samples?.length ?? 0})`,
+      sampleCount: samples?.length ?? 0,
+      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
+      calculatedValue: samples?.length ?? 0,
+      error: null,
+    });
+  } catch (e: any) {
+    queries.push({
+      metric: 'STAND_HOURS',
+      queryParams,
+      rawResponse: 'ERROR',
+      sampleCount: 0,
+      firstSample: 'N/A',
+      calculatedValue: 0,
+      error: e.message,
+    });
+  }
+
+  return {
+    timestamp: now.toISOString(),
+    queries,
+  };
+}
