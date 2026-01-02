@@ -141,29 +141,39 @@ export async function runLeagueSpeedRun(
 
     // Create bot users and add as members
     const botIds: string[] = [];
+    addStep({
+      type: 'setup',
+      title: 'Creating Bot Users',
+      description: `Creating ${playerCount - 1} bot players...`,
+      success: true,
+    });
+    
     for (let i = 0; i < playerCount - 1; i++) {
-      // Generate proper UUID v4 format for bot
       const botId = `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`;
       botIds.push(botId);
 
-      // Create bot user profile - MUST succeed for foreign key constraint
-      const { error: botUserError } = await supabase
+      // Create bot user profile
+      const { error: userError } = await supabase
         .from('users')
         .upsert({
           id: botId,
           email: `bot${i}@speedrun.test`,
           username: BOT_NAMES[i] || `Bot ${i + 1}`,
-        }, {
-          onConflict: 'id',
         });
 
-      if (botUserError) {
-        console.error(`Failed to create bot user ${botId}:`, botUserError);
-        throw new Error(`Failed to create bot user: ${botUserError.message}`);
+      if (userError) {
+        addStep({
+          type: 'error',
+          title: `Bot Creation Failed`,
+          description: `Failed to create bot ${i + 1}: ${userError.message}`,
+          success: false,
+          data: { error: userError },
+        });
+        throw new Error(`Failed to create bot user: ${userError.message}`);
       }
 
       // Add bot to league
-      const { error: botMemberError } = await supabase
+      const { error: memberError } = await supabase
         .from('league_members')
         .insert({
           league_id: leagueId,
@@ -171,9 +181,15 @@ export async function runLeagueSpeedRun(
           is_admin: false,
         });
 
-      if (botMemberError) {
-        console.error(`Failed to add bot ${botId} to league:`, botMemberError);
-        throw new Error(`Failed to add bot to league: ${botMemberError.message}`);
+      if (memberError) {
+        addStep({
+          type: 'error',
+          title: `Bot Join Failed`,
+          description: `Failed to add bot ${i + 1} to league: ${memberError.message}`,
+          success: false,
+          data: { error: memberError },
+        });
+        throw new Error(`Failed to add bot to league: ${memberError.message}`);
       }
     }
 
@@ -182,9 +198,9 @@ export async function runLeagueSpeedRun(
     addStep({
       type: 'setup',
       title: 'Players Added',
-      description: `${allPlayerIds.length} players in league`,
+      description: `${allPlayerIds.length} players in league (You + ${botIds.length} bots)`,
       success: true,
-      data: { playerCount: allPlayerIds.length },
+      data: { playerCount: allPlayerIds.length, botCount: botIds.length, botNames: botIds.map((id, i) => BOT_NAMES[i]) },
     });
 
     // ========================================

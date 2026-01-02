@@ -64,7 +64,7 @@ export default function CreateLeagueScreen() {
     points_per_1000_steps: DEFAULT_SCORING_CONFIG.POINTS_PER_1000_STEPS,
     points_per_sleep_hour: DEFAULT_SCORING_CONFIG.POINTS_PER_SLEEP_HOUR,
     points_per_100_active_cal: DEFAULT_SCORING_CONFIG.POINTS_PER_100_ACTIVE_CAL,
-    points_per_workout: DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT,
+    points_per_workout: DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE,
     points_per_mile: DEFAULT_SCORING_CONFIG.POINTS_PER_MILE,
   });
   const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string; join_code: string } | null>(null);
@@ -423,17 +423,17 @@ Join Code: ${joinCode}`;
                   <View style={styles.scoringInputRow}>
                     <View style={styles.scoringInputLeft}>
                       <Text style={styles.scoringInputLabel}>💪 Workouts</Text>
-                      <Text style={styles.scoringInputHint}>Points per workout (0-100)</Text>
+                      <Text style={styles.scoringInputHint}>Points per minute (0-10)</Text>
                     </View>
                     <TextInput
                       style={styles.scoringInput}
                       value={scoringConfig.points_per_workout.toString()}
                       onChangeText={(text) => {
-                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT);
+                        const val = sanitizeScoringValue(text, DEFAULT_SCORING_CONFIG.POINTS_PER_WORKOUT_MINUTE);
                         setScoringConfig({ ...scoringConfig, points_per_workout: val });
                       }}
-                      keyboardType="numeric"
-                      placeholder="20"
+                      keyboardType="decimal-pad"
+                      placeholder="0.2"
                     />
                   </View>
 
