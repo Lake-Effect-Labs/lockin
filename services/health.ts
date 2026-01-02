@@ -2,6 +2,11 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { FitnessMetrics } from './scoring';
 
+// Import the correct modules from Kingstinct
+let QuantityTypes: any = null;
+let CategoryTypes: any = null;
+let Core: any = null;
+
 // ============================================
 // HEALTH DATA SERVICE
 // iOS-only health data integration via Apple HealthKit
@@ -35,23 +40,31 @@ let HealthKit: any = null;
 let loadError: any = null;
 
 /**
- * Get the Apple HealthKit module (cached, lazy-loaded)
+ * Get the Apple HealthKit modules (cached, lazy-loaded)
+ * Uses the correct QuantityTypes, CategoryTypes, and Core exports
  */
-function getHealthKit(): any {
-  if (!HealthKit && !loadError) {
+function getHealthKit(): { QuantityTypes: any; CategoryTypes: any; Core: any } | null {
+  if (!QuantityTypes && !loadError) {
     try {
       console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       const healthModule = require('@kingstinct/react-native-healthkit');
 
-      // Handle both default export and direct export
-      HealthKit = healthModule?.default ?? healthModule;
+      // Extract the correct modules
+      QuantityTypes = healthModule?.QuantityTypes ?? healthModule?.default?.QuantityTypes;
+      CategoryTypes = healthModule?.CategoryTypes ?? healthModule?.default?.CategoryTypes;
+      Core = healthModule?.Core ?? healthModule?.default?.Core;
 
       console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
-      console.log('📊 Module available');
-      console.log('   - Export keys:', Object.keys(HealthKit || {}).slice(0, 10).join(', '));
-      console.log('   - Has requestAuthorization:', typeof HealthKit?.requestAuthorization);
+      console.log('📊 Modules available:');
+      console.log('   - QuantityTypes:', !!QuantityTypes);
+      console.log('   - CategoryTypes:', !!CategoryTypes);
+      console.log('   - Core:', !!Core);
 
-      return HealthKit;
+      if (!QuantityTypes || !CategoryTypes || !Core) {
+        throw new Error('Missing required modules (QuantityTypes, CategoryTypes, or Core)');
+      }
+
+      return { QuantityTypes, CategoryTypes, Core };
     } catch (error: any) {
       loadError = error; // Cache the error to avoid repeated attempts
 
@@ -72,7 +85,24 @@ function getHealthKit(): any {
     return null; // Return null if we already tried and failed
   }
 
-  return HealthKit;
+  return { QuantityTypes, CategoryTypes, Core };
+}
+
+/**
+ * Helper to build date filter with strict flags (only includes dates if provided)
+ * Predicate supports startDate / endDate with optional strict flags
+ */
+function buildDateFilter(startDate?: Date, endDate?: Date): any {
+  const filter: any = {};
+  if (startDate) {
+    filter.startDate = startDate;
+    filter.strictStartDate = true;
+  }
+  if (endDate) {
+    filter.endDate = endDate;
+    filter.strictEndDate = true;
+  }
+  return Object.keys(filter).length ? filter : undefined;
 }
 
 /**
@@ -126,17 +156,17 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('   ✅ PASSED: Module loaded');
     console.log('');
 
-    // Step 4: Check if requestAuthorization exists
+    // Step 4: Check if Core.requestAuthorization exists
     console.log('📱 STEP 4: Check requestAuthorization availability');
 
-    if (typeof module.requestAuthorization !== 'function') {
-      console.log('   ❌ FAILED: requestAuthorization is not a function');
-      console.log('   - typeof:', typeof module.requestAuthorization);
-      console.log('   - Available methods:', Object.keys(module || {}).slice(0, 15).join(', '));
+    if (typeof module.Core.requestAuthorization !== 'function') {
+      console.log('   ❌ FAILED: Core.requestAuthorization is not a function');
+      console.log('   - typeof:', typeof module.Core.requestAuthorization);
+      console.log('   - Available methods:', Object.keys(module.Core || {}).slice(0, 15).join(', '));
       console.log('='.repeat(60));
       return false;
     }
-    console.log('   ✅ PASSED: requestAuthorization available');
+    console.log('   ✅ PASSED: Core.requestAuthorization available');
     console.log('');
 
     // Step 5: Request authorization
@@ -145,7 +175,7 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('');
 
     console.log('🚀 STEP 6: Initialize HealthKit');
-    console.log('   - Calling: module.requestAuthorization()');
+    console.log('   - Calling: Core.requestAuthorization(toShare, toRead)');
     console.log('   - Start time:', new Date().toISOString());
     console.log('');
     console.log('   ⏳ WAITING FOR USER INTERACTION...');
@@ -154,18 +184,18 @@ export async function initializeHealth(): Promise<boolean> {
 
     const startAuthTime = Date.now();
 
-    // Modern Kingstinct API - no callbacks, uses async/await
-    await module.requestAuthorization({
-      toRead: [
+    // Correct Kingstinct API: positional args (toShare, toRead)
+    await module.Core.requestAuthorization(
+      [], // toShare (empty - we don't write data)
+      [
         'HKQuantityTypeIdentifierStepCount',
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         'HKCategoryTypeIdentifierSleepAnalysis',
         'HKCategoryTypeIdentifierAppleStandHour',
         'HKWorkoutTypeIdentifier',
-      ],
-      toShare: [],
-    });
+      ] // toRead
+    );
 
     const authDuration = Date.now() - startAuthTime;
 
@@ -259,11 +289,17 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     // For steps, we need to SUM all samples (not just get the latest)
     // Each step sample represents a segment of steps (e.g., from a walk)
-    if (typeof module.queryQuantitySamples === 'function') {
-      // API requires 2 arguments: identifier and options (even if empty)
-      const samples = await module.queryQuantitySamples(
+    if (module.QuantityTypes && typeof module.QuantityTypes.queryQuantitySamples === 'function') {
+      // Correct API: QuantityTypes.queryQuantitySamples(identifier, options)
+      // Filter uses Date objects with startDate/endDate at top level
+      const samples = await module.QuantityTypes.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        {} // Empty options object
+        {
+          unit: 'count',
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
 
       console.log('📊 [Steps] Raw response:', {
@@ -273,45 +309,23 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
         sampleKeys: samples?.[0] ? Object.keys(samples[0]) : [],
       });
 
-      // Filter samples for today and sum them
+      // Samples are already filtered by the API, just sum them
       if (samples && Array.isArray(samples)) {
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
+        console.log('📊 [Steps] Processing', samples.length, 'samples');
         
-        console.log('📊 [Steps] Filtering samples:', {
-          dayStart: dayStart.toISOString(),
-          dayEnd: dayEnd.toISOString(),
-          totalSamples: samples.length,
-        });
-        
-        const filteredSamples = samples.filter((sample: any) => {
-          const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-          const isInRange = sampleDate >= dayStart && sampleDate <= dayEnd;
-          if (!isInRange && samples.length < 10) {
-            console.log('📊 [Steps] Sample outside range:', {
-              sampleDate: sampleDate.toISOString(),
-              startDate: sample?.startDate,
-              isInRange,
-            });
-          }
-          return isInRange;
-        });
-        
-        console.log('📊 [Steps] Filtered samples:', filteredSamples.length);
-        
-        const total = filteredSamples.reduce((sum: number, sample: any) => {
-          // Try multiple property names - different versions might use different names
-          const value = sample?.quantity ?? sample?.value ?? sample?.count ?? 0;
+        const total = samples.reduce((sum: number, sample: any) => {
+          // Kingstinct uses 'quantity' property
+          const value = sample?.quantity ?? 0;
           return sum + value;
         }, 0);
         
-        console.log('📊 [Steps] Total calculated:', total, 'from', filteredSamples.length, 'samples');
+        console.log('📊 [Steps] Total calculated:', total, 'from', samples.length, 'samples');
         return Math.round(total);
+      } else {
+        console.log('📊 [Steps] No samples or not an array');
       }
     } else {
-      console.log('⚠️ [Steps] queryQuantitySamples not available');
+      console.log('⚠️ [Steps] QuantityTypes.queryQuantitySamples not available');
     }
 
     return 0;
@@ -345,17 +359,20 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     let results: any[] = [];
 
     console.log('😴 [Sleep] Querying:', { from: from.toISOString(), to: to.toISOString() });
-    console.log('😴 [Sleep] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Try queryCategorySamples for sleep (category-type data)
-    // API requires 2 arguments: identifier and options (even if empty)
-    if (typeof module.queryCategorySamples === 'function') {
-      results = await module.queryCategorySamples(
+    // Correct API: CategoryTypes.queryCategorySamples(identifier, options)
+    if (module.CategoryTypes && typeof module.CategoryTypes.queryCategorySamples === 'function') {
+      results = await module.CategoryTypes.queryCategorySamples(
         'HKCategoryTypeIdentifierSleepAnalysis',
-        {} // Empty options object
+        {
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
     } else {
-      console.log('😴 [Sleep] queryCategorySamples not available');
+      console.log('😴 [Sleep] CategoryTypes.queryCategorySamples not available');
     }
 
     console.log('😴 [Sleep] Raw response:', {
@@ -433,13 +450,18 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     // For calories, we need to SUM all samples (not just get the latest)
-    if (typeof module.queryQuantitySamples === 'function') {
+    if (module.QuantityTypes && typeof module.QuantityTypes.queryQuantitySamples === 'function') {
       console.log('🔥 [Calories] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
-      // API requires 2 arguments: identifier and options (even if empty)
-      const samples = await module.queryQuantitySamples(
+      // Correct API: QuantityTypes.queryQuantitySamples(identifier, options)
+      const samples = await module.QuantityTypes.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
-        {} // Empty options object
+        {
+          unit: 'kcal',
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
 
       console.log('🔥 [Calories] Response:', {
@@ -447,19 +469,9 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
         first: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 100) : 'none',
       });
 
-      // Filter samples for today and sum them
+      // Samples are already filtered by the API, just sum them
       if (samples && Array.isArray(samples)) {
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-
-        const total = samples
-          .filter((sample: any) => {
-            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-            return sampleDate >= dayStart && sampleDate <= dayEnd;
-          })
-          .reduce((sum: number, sample: any) => {
+        const total = samples.reduce((sum: number, sample: any) => {
             const value = sample?.quantity ?? sample?.value ?? 0;
             return sum + value;
           }, 0);
@@ -496,13 +508,18 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     let totalMeters = 0;
 
     // For distance, we need to SUM all samples (not just get the latest)
-    if (typeof module.queryQuantitySamples === 'function') {
+    if (module.QuantityTypes && typeof module.QuantityTypes.queryQuantitySamples === 'function') {
       console.log('🏃 [Distance] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
-      // API requires 2 arguments: identifier and options (even if empty)
-      const samples = await module.queryQuantitySamples(
+      // Correct API: QuantityTypes.queryQuantitySamples(identifier, options)
+      const samples = await module.QuantityTypes.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
-        {} // Empty options object
+        {
+          unit: 'm', // meters
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
 
       console.log('🏃 [Distance] Response:', {
@@ -510,14 +527,18 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
         first: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 100) : 'none',
       });
 
-      // Sum all distance samples for the day
+      // Samples are already filtered by the API, just sum them
       if (samples && Array.isArray(samples)) {
         totalMeters = samples.reduce((sum: number, sample: any) => {
-          const value = sample?.quantity ?? sample?.value ?? 0;
+          const value = sample?.quantity ?? 0;
           return sum + value;
         }, 0);
         console.log('🏃 [Distance] Total meters:', totalMeters, '= miles:', (totalMeters / 1609.34).toFixed(2));
+      } else {
+        console.log('🏃 [Distance] No samples or not an array');
       }
+    } else {
+      console.log('⚠️ [Distance] QuantityTypes.queryQuantitySamples not available');
     }
 
     // Convert meters to miles
@@ -547,18 +568,11 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     console.log('💪 [Workouts] Querying:', { from: from.toISOString(), to: to.toISOString() });
-    console.log('💪 [Workouts] queryWorkouts available:', typeof module.queryWorkouts === 'function');
 
-    // Query workouts using Kingstinct API
-    // API: queryWorkouts({ from, to }) - use timestamps
-    if (typeof module.queryWorkouts === 'function') {
-      results = await module.queryWorkouts({
-        from: from.getTime(),
-        to: to.getTime(),
-      });
-    } else {
-      console.log('💪 [Workouts] queryWorkouts not available, no fallback');
-    }
+    // Workouts might be in a different module - for now, return empty array
+    // TODO: Check if there's a WorkoutTypes module or similar
+    results = [];
+    console.log('💪 [Workouts] Workout querying not yet implemented with new API');
 
     console.log('💪 [Workouts] Raw response:', {
       isArray: Array.isArray(results),
@@ -621,17 +635,20 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     to.setHours(23, 59, 59, 999);
 
     console.log('⏰ [Stand Hours] Querying:', { from: from.toISOString(), to: to.toISOString() });
-    console.log('⏰ [Stand Hours] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
 
     // Query stand hours using Kingstinct API
-    // API requires 2 arguments: identifier and options (even if empty)
-    if (typeof module.queryCategorySamples === 'function') {
-      results = await module.queryCategorySamples(
+    // Correct API: CategoryTypes.queryCategorySamples(identifier, options)
+    if (module.CategoryTypes && typeof module.CategoryTypes.queryCategorySamples === 'function') {
+      results = await module.CategoryTypes.queryCategorySamples(
         'HKCategoryTypeIdentifierAppleStandHour',
-        {} // Empty options object
+        {
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
     } else {
-      console.log('⏰ [Stand Hours] queryCategorySamples not available');
+      console.log('⏰ [Stand Hours] CategoryTypes.queryCategorySamples not available');
     }
 
     console.log('⏰ [Stand Hours] Raw response:', {
@@ -645,20 +662,11 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
       return 0;
     }
 
-    // Filter for today's stand hours
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    // Samples are already filtered by the API, just count them
+    // Each sample represents 1 stand hour
+    const standHours = results.length;
 
-    const filteredSamples = results.filter((sample: any) => {
-      const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-      return sampleDate >= dayStart && sampleDate <= dayEnd;
-    });
-    
-    const standHours = filteredSamples.length; // Each sample represents 1 stand hour
-
-    console.log('⏰ [Stand Hours] Total hours stood:', standHours, 'from', filteredSamples.length, 'samples');
+    console.log('⏰ [Stand Hours] Total hours stood:', standHours, 'from', results.length, 'samples');
     return standHours;
   } catch (err: any) {
     console.error('❌ Error getting stand hours:', err);
@@ -723,6 +731,7 @@ export function getFakeHealthData(date: Date = new Date()): DailyHealthData {
     calories: 400 + (seed * 97) % 300,
     distance: 3 + (seed * 53) % 5,
     workouts: (seed * 17) % 2,
+    standHours: 8 + (seed * 41) % 4,
   };
 }
 
@@ -773,6 +782,7 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
         calories: 0,
         distance: 0,
         workouts: 0,
+        standHours: 0,
       });
     }
   }
@@ -810,6 +820,7 @@ export async function getHealthDataRange(startDate: Date, endDate: Date): Promis
         calories: 0,
         distance: 0,
         workouts: 0,
+        standHours: 0,
       });
     }
     current.setDate(current.getDate() + 1);
@@ -833,7 +844,11 @@ export function getHealthDiagnostics(): {
   availableMethods: string[];
 } {
   const module = getHealthKit();
-  const availableMethods = module ? Object.keys(module).filter(k => typeof module[k] === 'function').slice(0, 15) : [];
+  const availableMethods = module ? [
+    ...(module.QuantityTypes ? ['QuantityTypes'] : []),
+    ...(module.CategoryTypes ? ['CategoryTypes'] : []),
+    ...(module.Core ? ['Core'] : []),
+  ] : [];
 
   return {
     platform: Platform.OS,
@@ -890,14 +905,14 @@ export async function getHealthDiagnosticReport(): Promise<{
   moduleStatus = '✅ Loaded';
 
   // Check available methods
-  const hasQueryMethod = typeof module.queryQuantitySamples === 'function';
-  const hasAuthMethod = typeof module.requestAuthorization === 'function';
+  const hasQueryMethod = module.QuantityTypes && typeof module.QuantityTypes.queryQuantitySamples === 'function';
+  const hasAuthMethod = module.Core && typeof module.Core.requestAuthorization === 'function';
 
   if (!hasAuthMethod) {
-    errors.push('requestAuthorization method not found');
+    errors.push('Core.requestAuthorization method not found');
   }
   if (!hasQueryMethod) {
-    errors.push('queryQuantitySamples method not found');
+    errors.push('QuantityTypes.queryQuantitySamples method not found');
   }
 
   authStatus = hasAuthMethod ? '✅ Available' : '❌ Missing';
@@ -911,10 +926,15 @@ export async function getHealthDiagnosticReport(): Promise<{
       const to = new Date(now);
       to.setHours(23, 59, 59, 999);
 
-      // API requires 2 arguments: identifier and options (even if empty)
-      const rawSamples = await module.queryQuantitySamples(
+      // Correct API: QuantityTypes.queryQuantitySamples(identifier, options)
+      const rawSamples = await module.QuantityTypes.queryQuantitySamples(
         'HKQuantityTypeIdentifierStepCount',
-        {} // Empty options object
+        {
+          unit: 'count',
+          limit: 1000,
+          ascending: false,
+          filter: buildDateFilter(from, to),
+        }
       );
 
       if (rawSamples && rawSamples.length > 0) {
@@ -1003,9 +1023,14 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Steps
   try {
-    const samples = await module.queryQuantitySamples(
+    const samples = await module.QuantityTypes.queryQuantitySamples(
       'HKQuantityTypeIdentifierStepCount',
-      {} // Empty options object
+      {
+        unit: 'count',
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      }
     );
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1033,9 +1058,14 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Calories
   try {
-    const samples = await module.queryQuantitySamples(
+    const samples = await module.QuantityTypes.queryQuantitySamples(
       'HKQuantityTypeIdentifierActiveEnergyBurned',
-      {} // Empty options object
+      {
+        unit: 'kcal',
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      }
     );
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1063,9 +1093,14 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Distance
   try {
-    const samples = await module.queryQuantitySamples(
+    const samples = await module.QuantityTypes.queryQuantitySamples(
       'HKQuantityTypeIdentifierDistanceWalkingRunning',
-      {} // Empty options object
+      {
+        unit: 'm',
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      }
     );
     const totalMeters = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? s?.value ?? 0), 0)
@@ -1097,9 +1132,13 @@ export async function getRawHealthDebug(): Promise<{
     sleepFrom.setDate(sleepFrom.getDate() - 1);
     sleepFrom.setHours(18, 0, 0, 0);
 
-    const samples = await module.queryCategorySamples(
+    const samples = await module.CategoryTypes.queryCategorySamples(
       'HKCategoryTypeIdentifierSleepAnalysis',
-      {} // Empty options object
+      {
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(sleepFrom, to),
+      }
     );
 
     let totalMinutes = 0;
@@ -1134,10 +1173,8 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Workouts
   try {
-    const samples = await module.queryWorkouts?.({
-      from: from.getTime(),
-      to: to.getTime(),
-    });
+    // Workouts query not yet implemented with new API structure
+    const samples: any[] = [];
 
     let totalMinutes = 0;
     if (Array.isArray(samples)) {
@@ -1171,9 +1208,13 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Stand Hours
   try {
-    const samples = await module.queryCategorySamples(
+    const samples = await module.CategoryTypes.queryCategorySamples(
       'HKCategoryTypeIdentifierAppleStandHour',
-      {} // Empty options object
+      {
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      }
     );
 
     queries.push({
