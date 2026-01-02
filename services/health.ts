@@ -161,6 +161,7 @@ export async function initializeHealth(): Promise<boolean> {
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         'HKCategoryTypeIdentifierSleepAnalysis',
+        'HKCategoryTypeIdentifierAppleStandHour',
         'HKWorkoutTypeIdentifier',
       ],
       toShare: [],
@@ -353,6 +354,9 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
 
     let results: any[] = [];
 
+    console.log('😴 [Sleep] Querying:', { from: from.toISOString(), to: to.toISOString() });
+    console.log('😴 [Sleep] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
+
     // Try queryCategorySamples for sleep (category-type data)
     // API: queryCategorySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
     if (typeof module.queryCategorySamples === 'function') {
@@ -368,21 +372,8 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
           },
         }
       );
-    }
-    // Fallback: try queryQuantitySamples with sleep type
-    else if (typeof module.queryQuantitySamples === 'function') {
-      results = await module.queryQuantitySamples(
-        'HKCategoryTypeIdentifierSleepAnalysis',
-        {
-          limit: -1,
-          filter: {
-            date: {
-              startDate: from,
-              endDate: to,
-            },
-          },
-        }
-      );
+    } else {
+      console.log('😴 [Sleep] queryCategorySamples not available');
     }
 
     console.log('😴 [Sleep] Raw response:', {
@@ -462,6 +453,8 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     // For calories, we need to SUM all samples (not just get the latest)
     // API: queryQuantitySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
     if (typeof module.queryQuantitySamples === 'function') {
+      console.log('🔥 [Calories] Querying:', { from: from.toISOString(), to: to.toISOString() });
+
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         {
@@ -475,22 +468,18 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
         }
       );
 
-      // Filter samples for today and sum them
-      if (samples && Array.isArray(samples)) {
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        const total = samples
-          .filter((sample: any) => {
-            const sampleDate = new Date(sample?.startDate || sample?.date || 0);
-            return sampleDate >= dayStart && sampleDate <= dayEnd;
-          })
-          .reduce((sum: number, sample: any) => {
-            const value = sample?.quantity ?? sample?.value ?? 0;
-            return sum + value;
-          }, 0);
+      console.log('🔥 [Calories] Response:', {
+        count: samples?.length ?? 0,
+        first: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 100) : 'none',
+      });
+
+      // Sum all samples - API already filtered by date
+      if (samples && Array.isArray(samples) && samples.length > 0) {
+        const total = samples.reduce((sum: number, sample: any) => {
+          const value = sample?.quantity ?? sample?.value ?? 0;
+          return sum + value;
+        }, 0);
+        console.log('🔥 [Calories] Total:', Math.round(total));
         return Math.round(total);
       }
     }
@@ -525,6 +514,8 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     // For distance, we need to SUM all samples (not just get the latest)
     // API: queryQuantitySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
     if (typeof module.queryQuantitySamples === 'function') {
+      console.log('🏃 [Distance] Querying:', { from: from.toISOString(), to: to.toISOString() });
+
       const samples = await module.queryQuantitySamples(
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         {
@@ -538,12 +529,18 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
         }
       );
 
+      console.log('🏃 [Distance] Response:', {
+        count: samples?.length ?? 0,
+        first: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 100) : 'none',
+      });
+
       // Sum all distance samples for the day
-      if (samples && Array.isArray(samples)) {
+      if (samples && Array.isArray(samples) && samples.length > 0) {
         totalMeters = samples.reduce((sum: number, sample: any) => {
           const value = sample?.quantity ?? sample?.value ?? 0;
           return sum + value;
         }, 0);
+        console.log('🏃 [Distance] Total meters:', totalMeters, '= miles:', (totalMeters / 1609.34).toFixed(2));
       }
     }
 
@@ -568,14 +565,17 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
   try {
     let results: any[] = [];
 
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
+
+    console.log('💪 [Workouts] Querying:', { from: from.toISOString(), to: to.toISOString() });
+    console.log('💪 [Workouts] queryWorkoutSamples available:', typeof module.queryWorkoutSamples === 'function');
+
     // Query workouts using Kingstinct API
     // API: queryWorkoutSamples({ limit, filter: { date: { startDate, endDate } } })
     if (typeof module.queryWorkoutSamples === 'function') {
-      const from = new Date(date);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(date);
-      to.setHours(23, 59, 59, 999);
-
       results = await module.queryWorkoutSamples({
         limit: -1, // -1 means fetch all samples
         filter: {
@@ -585,23 +585,8 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
           },
         },
       });
-    }
-    // Fallback: try old queryWorkouts API if available
-    else if (typeof module.queryWorkouts === 'function') {
-      const from = new Date(date);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(date);
-      to.setHours(23, 59, 59, 999);
-
-      results = await module.queryWorkouts({
-        limit: -1,
-        filter: {
-          date: {
-            startDate: from,
-            endDate: to,
-          },
-        },
-      });
+    } else {
+      console.log('💪 [Workouts] queryWorkoutSamples not available, no fallback');
     }
 
     console.log('💪 [Workouts] Raw response:', {
@@ -659,14 +644,17 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
   try {
     let results: any[] = [];
 
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
+
+    console.log('⏰ [Stand Hours] Querying:', { from: from.toISOString(), to: to.toISOString() });
+    console.log('⏰ [Stand Hours] queryCategorySamples available:', typeof module.queryCategorySamples === 'function');
+
     // Query stand hours using Kingstinct API
     // API: queryCategorySamples(identifier, { limit, filter: { date: { startDate, endDate } } })
     if (typeof module.queryCategorySamples === 'function') {
-      const from = new Date(date);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(date);
-      to.setHours(23, 59, 59, 999);
-
       results = await module.queryCategorySamples(
         'HKCategoryTypeIdentifierAppleStandHour',
         {
@@ -679,6 +667,8 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
           },
         }
       );
+    } else {
+      console.log('⏰ [Stand Hours] queryCategorySamples not available');
     }
 
     console.log('⏰ [Stand Hours] Raw response:', {

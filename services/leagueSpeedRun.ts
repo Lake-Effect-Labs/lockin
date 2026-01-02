@@ -146,23 +146,35 @@ export async function runLeagueSpeedRun(
       const botId = `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`;
       botIds.push(botId);
 
-      // Create bot user profile
-      await supabase
+      // Create bot user profile - MUST succeed for foreign key constraint
+      const { error: botUserError } = await supabase
         .from('users')
         .upsert({
           id: botId,
           email: `bot${i}@speedrun.test`,
           username: BOT_NAMES[i] || `Bot ${i + 1}`,
+        }, {
+          onConflict: 'id',
         });
 
+      if (botUserError) {
+        console.error(`Failed to create bot user ${botId}:`, botUserError);
+        throw new Error(`Failed to create bot user: ${botUserError.message}`);
+      }
+
       // Add bot to league
-      await supabase
+      const { error: botMemberError } = await supabase
         .from('league_members')
         .insert({
           league_id: leagueId,
           user_id: botId,
           is_admin: false,
         });
+
+      if (botMemberError) {
+        console.error(`Failed to add bot ${botId} to league:`, botMemberError);
+        throw new Error(`Failed to add bot to league: ${botMemberError.message}`);
+      }
     }
 
     const allPlayerIds = [userId, ...botIds];
