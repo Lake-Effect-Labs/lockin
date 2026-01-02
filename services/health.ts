@@ -38,33 +38,49 @@ const isExpoGo = Constants?.executionEnvironment === 'storeClient';
 // Cache the HealthKit module
 let HealthKit: any = null;
 let loadError: any = null;
+let requestAuthorization: any = null;
+let WorkoutTypes: any = null;
 
 /**
  * Get the Apple HealthKit modules (cached, lazy-loaded)
  * Uses the correct QuantityTypes, CategoryTypes, and Core exports
  */
-function getHealthKit(): { QuantityTypes: any; CategoryTypes: any; Core: any } | null {
+function getHealthKit(): { QuantityTypes: any; CategoryTypes: any; WorkoutTypes: any; requestAuthorization: any } | null {
   if (!QuantityTypes && !loadError) {
     try {
       console.log('📦 Loading @kingstinct/react-native-healthkit module...');
       const healthModule = require('@kingstinct/react-native-healthkit');
 
-      // Extract the correct modules
-      QuantityTypes = healthModule?.QuantityTypes ?? healthModule?.default?.QuantityTypes;
-      CategoryTypes = healthModule?.CategoryTypes ?? healthModule?.default?.CategoryTypes;
-      Core = healthModule?.Core ?? healthModule?.default?.Core;
+      // Handle both default export and direct export (like it worked in 1.0.52)
+      const module = healthModule?.default ?? healthModule;
+
+      console.log('📊 Module structure:');
+      console.log('   - Direct exports:', Object.keys(module || {}).slice(0, 15).join(', '));
+
+      // Extract modules - try both patterns
+      QuantityTypes = module?.QuantityTypes;
+      CategoryTypes = module?.CategoryTypes;
+      WorkoutTypes = module?.WorkoutTypes;
+      
+      // requestAuthorization was likely directly on the module (like in 1.0.52)
+      requestAuthorization = module?.requestAuthorization;
 
       console.log('✅ @kingstinct/react-native-healthkit loaded successfully');
       console.log('📊 Modules available:');
       console.log('   - QuantityTypes:', !!QuantityTypes);
       console.log('   - CategoryTypes:', !!CategoryTypes);
-      console.log('   - Core:', !!Core);
+      console.log('   - WorkoutTypes:', !!WorkoutTypes);
+      console.log('   - requestAuthorization:', !!requestAuthorization);
 
-      if (!QuantityTypes || !CategoryTypes || !Core) {
-        throw new Error('Missing required modules (QuantityTypes, CategoryTypes, or Core)');
+      if (!QuantityTypes || !CategoryTypes) {
+        throw new Error('Missing required modules (QuantityTypes or CategoryTypes)');
       }
 
-      return { QuantityTypes, CategoryTypes, Core };
+      if (!requestAuthorization) {
+        console.log('   ⚠️ WARNING: requestAuthorization not found on module');
+      }
+
+      return { QuantityTypes, CategoryTypes, WorkoutTypes, requestAuthorization };
     } catch (error: any) {
       loadError = error; // Cache the error to avoid repeated attempts
 
@@ -85,7 +101,7 @@ function getHealthKit(): { QuantityTypes: any; CategoryTypes: any; Core: any } |
     return null; // Return null if we already tried and failed
   }
 
-  return { QuantityTypes, CategoryTypes, Core };
+  return { QuantityTypes, CategoryTypes, WorkoutTypes, requestAuthorization };
 }
 
 /**
@@ -156,26 +172,26 @@ export async function initializeHealth(): Promise<boolean> {
     console.log('   ✅ PASSED: Module loaded');
     console.log('');
 
-    // Step 4: Check if Core.requestAuthorization exists
+    // Step 4: Check if requestAuthorization exists (like it worked in 1.0.52)
     console.log('📱 STEP 4: Check requestAuthorization availability');
 
-    if (typeof module.Core.requestAuthorization !== 'function') {
-      console.log('   ❌ FAILED: Core.requestAuthorization is not a function');
-      console.log('   - typeof:', typeof module.Core.requestAuthorization);
-      console.log('   - Available methods:', Object.keys(module.Core || {}).slice(0, 15).join(', '));
+    if (!module.requestAuthorization || typeof module.requestAuthorization !== 'function') {
+      console.log('   ❌ FAILED: requestAuthorization is not a function');
+      console.log('   - typeof:', typeof module.requestAuthorization);
+      console.log('   - Available methods:', Object.keys(module || {}).slice(0, 15).join(', '));
       console.log('='.repeat(60));
       return false;
     }
-    console.log('   ✅ PASSED: Core.requestAuthorization available');
+    console.log('   ✅ PASSED: requestAuthorization available');
     console.log('');
 
-    // Step 5: Request authorization
+    // Step 5: Request authorization (using object format like 1.0.52)
     console.log('🔐 STEP 5: Request HealthKit Authorization');
     console.log('   - Requesting permissions for: StepCount, SleepAnalysis, ActiveEnergyBurned, DistanceWalkingRunning, Workout');
     console.log('');
 
     console.log('🚀 STEP 6: Initialize HealthKit');
-    console.log('   - Calling: Core.requestAuthorization(toShare, toRead)');
+    console.log('   - Calling: requestAuthorization({ toRead: [...], toShare: [] })');
     console.log('   - Start time:', new Date().toISOString());
     console.log('');
     console.log('   ⏳ WAITING FOR USER INTERACTION...');
@@ -184,18 +200,18 @@ export async function initializeHealth(): Promise<boolean> {
 
     const startAuthTime = Date.now();
 
-    // Correct Kingstinct API: positional args (toShare, toRead)
-    await module.Core.requestAuthorization(
-      [], // toShare (empty - we don't write data)
-      [
+    // Use object format (like it worked in 1.0.52)
+    await module.requestAuthorization({
+      toRead: [
         'HKQuantityTypeIdentifierStepCount',
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         'HKCategoryTypeIdentifierSleepAnalysis',
         'HKCategoryTypeIdentifierAppleStandHour',
         'HKWorkoutTypeIdentifier',
-      ] // toRead
-    );
+      ],
+      toShare: [],
+    });
 
     const authDuration = Date.now() - startAuthTime;
 
@@ -386,44 +402,36 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
       return 0;
     }
 
-    // Filter for today's sleep and sum up all sleep periods (in hours)
-    // Sleep from the previous night typically ends in the morning of the target date
-    const dayStart = new Date(date);
-    dayStart.setDate(dayStart.getDate() - 1);
-    dayStart.setHours(18, 0, 0, 0); // Start from 6 PM previous day
-    const dayEnd = new Date(date);
-    dayEnd.setHours(12, 0, 0, 0); // End at noon current day
+    // HealthKit already filtered by date, just aggregate durations
+    // Don't double-filter - let HealthKit handle date filtering
+    console.log('😴 [Sleep] Processing', results.length, 'samples (already filtered by HealthKit)');
     
-    console.log('😴 [Sleep] Filtering samples:', {
-      dayStart: dayStart.toISOString(),
-      dayEnd: dayEnd.toISOString(),
-      totalSamples: results.length,
-    });
-    
-    // Sum up all sleep periods (in hours)
-    // Filter for actual sleep (not "inBed" which is just time in bed)
-    const filteredSamples = results.filter((sample: any) => {
-      const endDate = new Date(sample?.endDate || sample?.date || 0);
-      return endDate >= dayStart && endDate <= dayEnd;
-    });
-    
-    console.log('😴 [Sleep] Filtered samples:', filteredSamples.length);
-    
-    const totalMinutes = filteredSamples.reduce((sum: number, sample: any) => {
-      // Skip "inBed" samples - only count actual sleep
-      // value 0 = inBed, value 1+ = various sleep stages
-      const value = sample?.value ?? sample?.category ?? 1;
-      if (value === 0) {
+    const totalMinutes = results.reduce((sum: number, sample: any) => {
+      // Only count samples with valid startDate and endDate
+      // Don't filter by value - HealthKit sleep stages are complex enums (asleepCore, deep, REM, etc.)
+      if (!sample?.startDate || !sample?.endDate) {
+        console.log('😴 [Sleep] Skipping sample without startDate/endDate');
         return sum;
       }
-
+      
+      // Calculate duration from startDate to endDate
       const start = new Date(sample.startDate).getTime();
       const end = new Date(sample.endDate).getTime();
-      return sum + (end - start) / (1000 * 60);
+      
+      // Skip invalid durations
+      if (isNaN(start) || isNaN(end) || end <= start) {
+        console.log('😴 [Sleep] Skipping invalid duration sample');
+        return sum;
+      }
+      
+      const durationMs = end - start;
+      const durationMinutes = durationMs / (1000 * 60);
+      console.log('😴 [Sleep] Sample duration:', durationMinutes.toFixed(1), 'minutes');
+      return sum + durationMinutes;
     }, 0);
 
     const totalHours = totalMinutes / 60;
-    console.log('😴 [Sleep] Total calculated:', totalHours.toFixed(1), 'hours from', filteredSamples.length, 'samples');
+    console.log('😴 [Sleep] Total calculated:', totalHours.toFixed(1), 'hours from', results.length, 'samples');
     return totalHours;
   } catch (err: any) {
     console.error('❌ Error getting sleep:', err);
@@ -569,10 +577,27 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
 
     console.log('💪 [Workouts] Querying:', { from: from.toISOString(), to: to.toISOString() });
 
-    // Workouts might be in a different module - for now, return empty array
-    // TODO: Check if there's a WorkoutTypes module or similar
-    results = [];
-    console.log('💪 [Workouts] Workout querying not yet implemented with new API');
+    // Query workouts using WorkoutTypes or fallback to direct module method
+    if (module.WorkoutTypes && typeof module.WorkoutTypes.queryWorkoutSamples === 'function') {
+      // Correct API: WorkoutTypes.queryWorkoutSamples(options)
+      results = await module.WorkoutTypes.queryWorkoutSamples({
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      });
+      console.log('💪 [Workouts] Using WorkoutTypes.queryWorkoutSamples');
+    } else if (typeof (module as any).queryWorkoutSamples === 'function') {
+      // Fallback: direct module method
+      results = await (module as any).queryWorkoutSamples({
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      });
+      console.log('💪 [Workouts] Using module.queryWorkoutSamples (fallback)');
+    } else {
+      console.log('💪 [Workouts] No workout query method available');
+      return 0;
+    }
 
     console.log('💪 [Workouts] Raw response:', {
       isArray: Array.isArray(results),
@@ -585,29 +610,33 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
       return 0;
     }
 
-    // Filter for today's workouts and sum up duration in minutes
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    // HealthKit already filtered by date, just aggregate durations
+    console.log('💪 [Workouts] Processing', results.length, 'workouts (already filtered by HealthKit)');
 
-    const filteredWorkouts = results.filter((workout: any) => {
-      const workoutDate = new Date(workout?.startDate || workout?.date || 0);
-      return workoutDate >= dayStart && workoutDate <= dayEnd;
-    });
-    
-    console.log('💪 [Workouts] Filtered workouts:', filteredWorkouts.length);
-
-    const totalMinutes = filteredWorkouts.reduce((sum: number, workout: any) => {
+    const totalMinutes = results.reduce((sum: number, workout: any) => {
+      // Only count workouts with valid startDate and endDate
+      if (!workout?.startDate || !workout?.endDate) {
+        console.log('💪 [Workouts] Skipping workout without startDate/endDate');
+        return sum;
+      }
+      
       // Get workout duration in minutes
       const start = new Date(workout.startDate).getTime();
       const end = new Date(workout.endDate).getTime();
+      
+      // Skip invalid durations
+      if (isNaN(start) || isNaN(end) || end <= start) {
+        console.log('💪 [Workouts] Skipping invalid duration workout');
+        return sum;
+      }
+      
       const durationMs = end - start;
       const durationMinutes = durationMs / (1000 * 60);
+      console.log('💪 [Workouts] Workout duration:', durationMinutes.toFixed(1), 'minutes');
       return sum + durationMinutes;
     }, 0);
 
-    console.log('💪 [Workouts] Total minutes:', totalMinutes, 'from', filteredWorkouts.length, 'workouts');
+    console.log('💪 [Workouts] Total minutes:', totalMinutes, 'from', results.length, 'workouts');
     return Math.round(totalMinutes);
   } catch (err: any) {
     console.error('❌ Error getting workouts:', err);
@@ -847,7 +876,7 @@ export function getHealthDiagnostics(): {
   const availableMethods = module ? [
     ...(module.QuantityTypes ? ['QuantityTypes'] : []),
     ...(module.CategoryTypes ? ['CategoryTypes'] : []),
-    ...(module.Core ? ['Core'] : []),
+    ...(module.requestAuthorization ? ['requestAuthorization'] : []),
   ] : [];
 
   return {
@@ -906,10 +935,10 @@ export async function getHealthDiagnosticReport(): Promise<{
 
   // Check available methods
   const hasQueryMethod = module.QuantityTypes && typeof module.QuantityTypes.queryQuantitySamples === 'function';
-  const hasAuthMethod = module.Core && typeof module.Core.requestAuthorization === 'function';
+  const hasAuthMethod = module.requestAuthorization && typeof module.requestAuthorization === 'function';
 
   if (!hasAuthMethod) {
-    errors.push('Core.requestAuthorization method not found');
+    errors.push('requestAuthorization method not found');
   }
   if (!hasQueryMethod) {
     errors.push('QuantityTypes.queryQuantitySamples method not found');
@@ -1173,8 +1202,22 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Workouts
   try {
-    // Workouts query not yet implemented with new API structure
-    const samples: any[] = [];
+    let samples: any[] = [];
+    
+    // Try WorkoutTypes first, then fallback
+    if (module.WorkoutTypes && typeof module.WorkoutTypes.queryWorkoutSamples === 'function') {
+      samples = await module.WorkoutTypes.queryWorkoutSamples({
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      });
+    } else if (typeof (module as any).queryWorkoutSamples === 'function') {
+      samples = await (module as any).queryWorkoutSamples({
+        limit: 1000,
+        ascending: false,
+        filter: buildDateFilter(from, to),
+      });
+    }
 
     let totalMinutes = 0;
     if (Array.isArray(samples)) {
