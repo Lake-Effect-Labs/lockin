@@ -29,7 +29,7 @@ import {
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
-import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport } from '@/services/health';
+import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport, getRawHealthDebug } from '@/services/health';
 import {
   runFullRegressionSuite,
   RegressionTestResults,
@@ -70,6 +70,8 @@ export default function DebugScreen() {
   const [simulationSteps, setSimulationSteps] = useState<SimulationStep[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const { fakeMode, setFakeMode } = useHealthStore();
+  const [rawHealthDebug, setRawHealthDebug] = useState<any>(null);
+  const [isLoadingRawDebug, setIsLoadingRawDebug] = useState(false);
   
   const runTests = () => {
     setIsRunning(true);
@@ -751,6 +753,60 @@ export default function DebugScreen() {
             <Ionicons name="analytics" size={20} color={colors.status.success} />
             <Text style={[styles.secondaryText, { color: colors.status.success }]}>📊 Show Today's Health Data</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={async () => {
+              setIsLoadingRawDebug(true);
+              try {
+                const debug = await getRawHealthDebug();
+                setRawHealthDebug(debug);
+              } catch (error: any) {
+                Alert.alert('❌ Error', `Debug failed: ${error.message}`);
+              } finally {
+                setIsLoadingRawDebug(false);
+              }
+            }}
+            disabled={isLoadingRawDebug}
+            style={[styles.secondaryButton, { borderColor: colors.status.error, borderWidth: 2 }]}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="code-slash" size={20} color={colors.status.error} />
+            <Text style={[styles.secondaryText, { color: colors.status.error }]}>
+              {isLoadingRawDebug ? '⏳ Loading...' : '🔍 RAW API DEBUG (Screenshot This!)'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Raw Health Debug Display - Scrollable for screenshots */}
+          {rawHealthDebug && (
+            <View style={styles.rawDebugContainer}>
+              <Text style={styles.rawDebugTitle}>🔍 RAW HEALTH API DEBUG</Text>
+              <Text style={styles.rawDebugTimestamp}>Timestamp: {rawHealthDebug.timestamp}</Text>
+
+              {rawHealthDebug.queries.map((q: any, i: number) => (
+                <View key={i} style={styles.rawDebugMetric}>
+                  <Text style={[
+                    styles.rawDebugMetricName,
+                    { color: q.error ? colors.status.error : (q.sampleCount > 0 ? colors.status.success : colors.status.warning) }
+                  ]}>
+                    {q.error ? '❌' : (q.sampleCount > 0 ? '✅' : '⚠️')} {q.metric}
+                  </Text>
+                  <Text style={styles.rawDebugText}>Samples: {q.sampleCount}</Text>
+                  <Text style={styles.rawDebugText}>Value: {q.calculatedValue}</Text>
+                  {q.error && <Text style={[styles.rawDebugText, { color: colors.status.error }]}>ERROR: {q.error}</Text>}
+                  <Text style={styles.rawDebugSample} numberOfLines={3}>
+                    First Sample: {q.firstSample}
+                  </Text>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                onPress={() => setRawHealthDebug(null)}
+                style={[styles.secondaryButton, { marginTop: 12 }]}
+              >
+                <Text style={styles.secondaryText}>Clear Debug Output</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Health Test Results */}
           {healthResults && (
@@ -1481,6 +1537,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.text.primary,
+  },
+  rawDebugContainer: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: colors.status.error,
+  },
+  rawDebugTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.status.error,
+    marginBottom: 8,
+  },
+  rawDebugTimestamp: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+    marginBottom: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  rawDebugMetric: {
+    backgroundColor: colors.background.card,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  rawDebugMetricName: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  rawDebugText: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  rawDebugSample: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
 

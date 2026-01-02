@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.lockin.app",
-      "buildNumber": "17",
+      "buildNumber": "18",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Lock-In uses Health data to power fitness leagues and insights.",
         "NSHealthUpdateUsageDescription": "Lock-In writes workout data you log.",
