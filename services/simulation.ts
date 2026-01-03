@@ -134,10 +134,10 @@ export function runWeeklyAccumulationTests(): TestResult[] {
   
   // Test aggregateWeeklyMetrics function
   const weeklyData: FitnessMetrics[] = [
-    { steps: 5000, sleepHours: 7, calories: 200, workouts: 0, distance: 2 },
-    { steps: 8000, sleepHours: 8, calories: 300, workouts: 1, distance: 3 },
-    { steps: 12000, sleepHours: 8.5, calories: 400, workouts: 2, distance: 5 },
-    { steps: 3000, sleepHours: 6, calories: 100, workouts: 0, distance: 1 },
+    { steps: 5000, sleepHours: 7, calories: 200, workouts: 0, standHours: 6, distance: 2 },
+    { steps: 8000, sleepHours: 8, calories: 300, workouts: 1, standHours: 8, distance: 3 },
+    { steps: 12000, sleepHours: 8.5, calories: 400, workouts: 2, standHours: 10, distance: 5 },
+    { steps: 3000, sleepHours: 6, calories: 100, workouts: 0, standHours: 4, distance: 1 },
   ];
   const aggregated = aggregateWeeklyMetrics(weeklyData);
   results.push({
@@ -490,9 +490,9 @@ export function runEdgeCaseTests(): TestResult[] {
   
   // TEST F7 — Weekly aggregation with null days
   const weekWithNulls: FitnessMetrics[] = [
-    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, distance: 2 },
+    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, standHours: 6, distance: 2 },
     null as any, // Missing day
-    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, distance: 3 },
+    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, standHours: 8, distance: 3 },
   ];
   const aggregatedWithNulls = aggregateWeeklyMetrics(weekWithNulls);
   results.push({

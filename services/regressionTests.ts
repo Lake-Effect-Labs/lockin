@@ -483,9 +483,9 @@ export function runWeeklyAggregationTests(): TestResult[] {
   
   // Test: Aggregation with null days (regression from null handling bug)
   const weekWithNulls: FitnessMetrics[] = [
-    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, distance: 2 },
+    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, standHours: 6, distance: 2 },
     null as any,
-    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, distance: 3 },
+    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, standHours: 8, distance: 3 },
   ];
   
   try {

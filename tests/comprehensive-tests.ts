@@ -223,13 +223,13 @@ test('Scoring', 'A7 - Points breakdown matches total', () => {
 // Test B1: Daily Steps Aggregation
 test('Weekly', 'B1 - Daily steps aggregate correctly', () => {
   const days: FitnessMetrics[] = [
-    { steps: 8000, sleepHours: 7, calories: 300, workouts: 0, distance: 3 },
-    { steps: 12000, sleepHours: 8, calories: 400, workouts: 1, distance: 5 },
-    { steps: 6000, sleepHours: 6, calories: 200, workouts: 0, distance: 2 },
-    { steps: 10000, sleepHours: 7.5, calories: 350, workouts: 1, distance: 4 },
-    { steps: 9000, sleepHours: 8, calories: 300, workouts: 0, distance: 3.5 },
-    { steps: 15000, sleepHours: 9, calories: 500, workouts: 2, distance: 6 },
-    { steps: 5000, sleepHours: 7, calories: 250, workouts: 0, distance: 2 },
+    { steps: 8000, sleepHours: 7, calories: 300, workouts: 0, standHours: 8, distance: 3 },
+    { steps: 12000, sleepHours: 8, calories: 400, workouts: 1, standHours: 10, distance: 5 },
+    { steps: 6000, sleepHours: 6, calories: 200, workouts: 0, standHours: 6, distance: 2 },
+    { steps: 10000, sleepHours: 7.5, calories: 350, workouts: 1, standHours: 9, distance: 4 },
+    { steps: 9000, sleepHours: 8, calories: 300, workouts: 0, standHours: 8, distance: 3.5 },
+    { steps: 15000, sleepHours: 9, calories: 500, workouts: 2, standHours: 12, distance: 6 },
+    { steps: 5000, sleepHours: 7, calories: 250, workouts: 0, standHours: 5, distance: 2 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -239,13 +239,13 @@ test('Weekly', 'B1 - Daily steps aggregate correctly', () => {
 // Test B2: Sleep Hours Aggregation
 test('Weekly', 'B2 - Sleep hours aggregate correctly', () => {
   const days: FitnessMetrics[] = [
-    { steps: 0, sleepHours: 7, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 6.5, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 7.5, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 9, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 5.5, calories: 0, workouts: 0, distance: 0 },
+    { steps: 0, sleepHours: 7, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 6.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 7.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 9, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 5.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -255,13 +255,13 @@ test('Weekly', 'B2 - Sleep hours aggregate correctly', () => {
 // Test B3: Workouts Aggregate as Integers
 test('Weekly', 'B3 - Workouts aggregate as integers', () => {
   const days: FitnessMetrics[] = [
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 2, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 2, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -275,6 +275,7 @@ test('Weekly', 'B4 - Empty array returns zero totals', () => {
   assertEqual(totals.sleepHours, 0);
   assertEqual(totals.calories, 0);
   assertEqual(totals.workouts, 0);
+  assertEqual(totals.standHours, 0);
   assertEqual(totals.distance, 0);
 });
 

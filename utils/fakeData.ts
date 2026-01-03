@@ -437,9 +437,10 @@ export function generateMockDataSet(userId: string): MockDataSet {
       sleepHours: acc.sleepHours + day.sleepHours,
       calories: acc.calories + day.calories,
       workouts: acc.workouts + day.workouts,
+      standHours: acc.standHours + (day.standHours || 0),
       distance: acc.distance + day.distance,
     }),
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 }
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 }
   );
   
   return {
