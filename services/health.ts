@@ -54,7 +54,7 @@ export async function initializeHealth(): Promise<boolean> {
         'HKQuantityTypeIdentifierDistanceWalkingRunning',
         'HKQuantityTypeIdentifierActiveEnergyBurned',
         'HKCategoryTypeIdentifierSleepAnalysis',
-        'HKCategoryTypeIdentifierAppleStandHour',
+        // Removed: 'HKCategoryTypeIdentifierAppleStandHour' - requires Apple Watch
         'HKWorkoutTypeIdentifier',
       ],
       toShare: [],
@@ -154,6 +154,7 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
+      unit: 'kilocalorie',
       limit: 10000,
       filter: { date: { startDate: from, endDate: to } },
     });
@@ -217,9 +218,14 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     if (samples && Array.isArray(samples) && samples.length > 0) {
       let totalMinutes = 0;
       samples.forEach((s: any) => {
-        const start = new Date(s.startDate).getTime();
-        const end = new Date(s.endDate).getTime();
-        totalMinutes += (end - start) / (1000 * 60);
+        // Ensure both startDate and endDate exist and are valid
+        if (s?.startDate && s?.endDate) {
+          const start = new Date(s.startDate).getTime();
+          const end = new Date(s.endDate).getTime();
+          if (!isNaN(start) && !isNaN(end) && end > start) {
+            totalMinutes += (end - start) / (1000 * 60);
+          }
+        }
       });
       return Math.round(totalMinutes);
     }
@@ -232,29 +238,11 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
 
 /**
  * Get stand hours for a date
+ * NOTE: Disabled - always returns 0
+ * Stand hours tracking removed due to Apple Watch requirement
  */
 export async function getDailyStandHours(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
-
-  try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
-
-    const samples = await queryCategorySamples('HKCategoryTypeIdentifierAppleStandHour', {
-      limit: 10000,
-      filter: { date: { startDate: from, endDate: to } },
-    });
-
-    if (samples && Array.isArray(samples)) {
-      return samples.length; // Each sample = 1 stand hour
-    }
-    return 0;
-  } catch (err: any) {
-    console.error('[Health] Stand hours error:', err?.message);
-    return 0;
-  }
+  return 0; // Disabled - requires Apple Watch
 }
 
 /**

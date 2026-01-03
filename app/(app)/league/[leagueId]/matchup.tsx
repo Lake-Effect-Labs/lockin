@@ -55,26 +55,27 @@ export default function MatchupScreen() {
     : undefined;
   
   const myBreakdown = userScore ? getPointsBreakdown({
-    steps: userScore.steps,
-    sleepHours: userScore.sleep_hours,
-    calories: userScore.calories,
-    workouts: userScore.workouts,
-    standHours: userScore.stand_hours,
-    distance: userScore.distance,
+    steps: userScore.steps || 0,
+    sleepHours: userScore.sleep_hours || 0,
+    calories: userScore.calories || 0,
+    workouts: userScore.workouts || 0,
+    standHours: userScore.stand_hours || 0,
+    distance: userScore.distance || 0,
   }, leagueScoringConfig) : null;
   
   const opponentBreakdown = opponentScore ? getPointsBreakdown({
-    steps: opponentScore.steps,
-    sleepHours: opponentScore.sleep_hours,
-    calories: opponentScore.calories,
-    workouts: opponentScore.workouts,
-    standHours: opponentScore.stand_hours,
-    distance: opponentScore.distance,
+    steps: opponentScore.steps || 0,
+    sleepHours: opponentScore.sleep_hours || 0,
+    calories: opponentScore.calories || 0,
+    workouts: opponentScore.workouts || 0,
+    standHours: opponentScore.stand_hours || 0,
+    distance: opponentScore.distance || 0,
   }, leagueScoringConfig) : null;
   
   // Use breakdown totals (current data) instead of matchup scores (may be outdated)
-  const myScore = myBreakdown?.totalPoints || (isPlayer1 ? currentMatchup.player1_score : currentMatchup.player2_score);
-  const theirScore = opponentBreakdown?.totalPoints || (isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score);
+  // Add ?? 0 fallback to prevent .toFixed() crash
+  const myScore = myBreakdown?.totalPoints ?? (isPlayer1 ? currentMatchup.player1_score : currentMatchup.player2_score) ?? 0;
+  const theirScore = opponentBreakdown?.totalPoints ?? (isPlayer1 ? currentMatchup.player2_score : currentMatchup.player1_score) ?? 0;
   
   const myScoreColor = getScoreColor(myScore, theirScore);
   const theirScoreColor = getScoreColor(theirScore, myScore);
@@ -202,13 +203,6 @@ export default function MatchupScreen() {
               format={(v) => `${v}m`}
             />
             <StatComparisonRow
-              icon="🧑‍💼"
-              label="Stand Hours"
-              value1={userScore?.stand_hours || 0}
-              value2={opponentScore?.stand_hours || 0}
-              format={(v) => `${v}h`}
-            />
-            <StatComparisonRow
               icon="🏃"
               label="Distance"
               value1={userScore?.distance || 0}
@@ -242,6 +236,8 @@ export default function MatchupScreen() {
               caloriesPoints={myBreakdown.caloriesPoints}
               workouts={userScore?.workouts || 0}
               workoutsPoints={myBreakdown.workoutsPoints}
+              standHours={userScore?.stand_hours || 0}
+              standHoursPoints={myBreakdown.standHoursPoints}
               distance={userScore?.distance || 0}
               distancePoints={myBreakdown.distancePoints}
               totalPoints={myBreakdown.totalPoints}

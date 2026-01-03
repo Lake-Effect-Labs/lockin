@@ -161,7 +161,7 @@ export function PointsBreakdown({
     { icon: '😴', label: 'Sleep', value: `${sleep.toFixed(1)}h`, points: sleepPoints, color: colors.secondary[500] },
     { icon: '🔥', label: 'Calories', value: calories.toLocaleString(), points: caloriesPoints, color: '#E74C3C' },
     { icon: '💪', label: 'Workout Mins', value: `${workouts}m`, points: workoutsPoints, color: colors.accent[500] },
-    { icon: '🧑‍💼', label: 'Stand Hours', value: `${standHours}h`, points: standHoursPoints, color: '#9B59B6' },
+    // Removed: Stand Hours - requires Apple Watch
     { icon: '🏃', label: 'Distance', value: `${distance.toFixed(1)} mi`, points: distancePoints, color: '#3498DB' },
   ];
   

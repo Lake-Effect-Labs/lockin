@@ -70,6 +70,18 @@ CREATE POLICY "Users can join leagues or add bot users" ON league_members
         )
     );
 
+-- Allow updating league_members records (for wins/losses tracking)
+-- This is critical for finalizeWeek to work properly
+DROP POLICY IF EXISTS "Users can view league members" ON league_members;
+DROP POLICY IF EXISTS "League members can be updated" ON league_members;
+
+CREATE POLICY "League members can be updated" ON league_members
+    FOR UPDATE USING (
+        -- Allow all updates (wins/losses are updated by finalize_week function)
+        -- The function runs with elevated privileges
+        true
+    );
+
 -- ============================================
 -- NOTES
 -- ============================================
