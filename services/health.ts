@@ -20,6 +20,7 @@ export interface HealthPermissions {
   calories: boolean;
   workouts: boolean;
   distance: boolean;
+  standHours: boolean;
 }
 
 export interface DailyHealthData extends FitnessMetrics {
@@ -290,6 +291,7 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
     calories: false,
     workouts: false,
     distance: false,
+    standHours: false
   };
 }
 
@@ -307,6 +309,7 @@ export function getFakeHealthData(date: Date = new Date()): DailyHealthData {
     calories: 400 + (seed * 97) % 300,
     distance: 3 + (seed * 53) % 5,
     workouts: (seed * 17) % 2,
+    standHours: 0
   };
 }
 
