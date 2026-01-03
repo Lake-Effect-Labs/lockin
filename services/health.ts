@@ -87,8 +87,8 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples)) {
@@ -117,8 +117,8 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples) && samples.length > 0) {
@@ -153,8 +153,8 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples)) {
@@ -181,8 +181,8 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples)) {
@@ -209,8 +209,8 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryWorkoutSamples({
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples) && samples.length > 0) {
@@ -242,8 +242,8 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
     to.setHours(23, 59, 59, 999);
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierAppleStandHour', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (samples && Array.isArray(samples)) {
@@ -463,8 +463,8 @@ export async function getHealthDiagnosticReport(): Promise<{
     to.setHours(23, 59, 59, 999);
 
     const rawSamples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
-      from: from,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
     });
 
     if (rawSamples && rawSamples.length > 0) {
@@ -551,7 +551,10 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Steps
   try {
-    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', { from, to });
+    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
+    });
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0)
       : 0;
@@ -578,7 +581,10 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Calories
   try {
-    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', { from, to });
+    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
+    });
     const total = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0)
       : 0;
@@ -605,7 +611,10 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Distance
   try {
-    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', { from, to });
+    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', {
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
+    });
     const totalMeters = Array.isArray(samples)
       ? samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0)
       : 0;
@@ -637,8 +646,8 @@ export async function getRawHealthDebug(): Promise<{
     sleepFrom.setHours(18, 0, 0, 0);
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
-      from: sleepFrom,
-      to: to,
+      limit: 10000,
+      filter: { date: { startDate: sleepFrom, endDate: to } },
     });
 
     let totalMinutes = 0;
@@ -673,7 +682,10 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Workouts
   try {
-    const samples = await queryWorkoutSamples({ from, to });
+    const samples = await queryWorkoutSamples({
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
+    });
 
     let totalMinutes = 0;
     if (Array.isArray(samples)) {
@@ -707,7 +719,10 @@ export async function getRawHealthDebug(): Promise<{
 
   // Test Stand Hours
   try {
-    const samples = await queryCategorySamples('HKCategoryTypeIdentifierAppleStandHour', { from, to });
+    const samples = await queryCategorySamples('HKCategoryTypeIdentifierAppleStandHour', {
+      limit: 10000,
+      filter: { date: { startDate: from, endDate: to } },
+    });
 
     queries.push({
       metric: 'STAND_HOURS',
