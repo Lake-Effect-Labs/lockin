@@ -204,12 +204,12 @@ export async function runLeagueSpeedRun(
     });
 
     // ========================================
-    // STEP 3: GENERATE MATCHUPS
+    // STEP 3: GENERATE INITIAL MATCHUPS
     // ========================================
     addStep({
       type: 'setup',
-      title: 'Generating Matchups',
-      description: 'Creating matchups for all weeks...',
+      title: 'Generating Week 1 Matchups',
+      description: 'Creating matchups for week 1...',
       success: true,
     });
 
@@ -221,15 +221,11 @@ export async function runLeagueSpeedRun(
       throw new Error(`Failed to generate matchups: ${matchupError.message}`);
     }
 
-    // Verify matchups were created
-    const matchups = await getMatchups(leagueId);
-
     addStep({
       type: 'setup',
-      title: 'Matchups Generated',
-      description: `Created ${matchups.length} matchups`,
+      title: 'Initial Matchups Generated',
+      description: `Week 1 matchups created`,
       success: true,
-      data: { matchupCount: matchups.length },
     });
 
     // ========================================
@@ -261,32 +257,21 @@ export async function runLeagueSpeedRun(
         });
       }
 
-      // Update matchup scores from weekly_scores
-      const weekMatchups = matchups.filter(m => m.week_number === week);
-
-      for (const matchup of weekMatchups) {
-        const p1Score = weekScores.find(s => s.playerId === matchup.player1_id)?.score || 0;
-        const p2Score = weekScores.find(s => s.playerId === matchup.player2_id)?.score || 0;
-
-        await supabase
-          .from('matchups')
-          .update({
-            player1_score: p1Score,
-            player2_score: p2Score,
-          })
-          .eq('id', matchup.id);
-      }
-
-      // Finalize the week
+      // Finalize the week (this updates matchup scores and determines winners)
       await finalizeWeek(leagueId, week);
 
-      // Update league current_week
+      // Update league current_week and generate next week's matchups
       const nextWeek = week + 1;
       if (nextWeek <= seasonWeeks) {
         await supabase
           .from('leagues')
           .update({ current_week: nextWeek })
           .eq('id', leagueId);
+
+        // Generate matchups for the next week
+        await supabase.rpc('generate_matchups', {
+          p_league_id: leagueId
+        });
       }
 
       // Get standings after week
@@ -298,6 +283,19 @@ export async function runLeagueSpeedRun(
 
       const leader = sortedMembers[0];
 
+      // Get this week's matchups to show results
+      const { data: weekMatchups } = await supabase
+        .from('matchups')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('week_number', week);
+
+      const matchupResults = weekMatchups?.map(m => ({
+        player1Score: m.player1_score,
+        player2Score: m.player2_score,
+        winnerId: m.winner_id,
+      })) || [];
+
       addStep({
         type: 'week',
         title: `Week ${week} Complete`,
@@ -305,6 +303,7 @@ export async function runLeagueSpeedRun(
         success: true,
         data: {
           week,
+          matchups: matchupResults,
           standings: sortedMembers.map(m => ({
             name: m.user?.username || m.user_id.substring(0, 8),
             wins: m.wins,
