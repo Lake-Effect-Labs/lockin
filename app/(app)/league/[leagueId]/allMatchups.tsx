@@ -216,8 +216,9 @@ function MatchupRow({ matchup, currentUserId, matchNumber }: MatchupRowProps) {
   const player1 = matchup.player1;
   const player2 = matchup.player2;
 
-  const score1 = matchup.player1Score?.total_points ?? matchup.player1_score;
-  const score2 = matchup.player2Score?.total_points ?? matchup.player2_score;
+  // Ensure scores default to 0 if both sources are null to avoid .toFixed() crash
+  const score1 = matchup.player1Score?.total_points ?? matchup.player1_score ?? 0;
+  const score2 = matchup.player2Score?.total_points ?? matchup.player2_score ?? 0;
 
   const isUserMatch = matchup.player1_id === currentUserId || matchup.player2_id === currentUserId;
 

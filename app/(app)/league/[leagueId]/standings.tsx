@@ -42,7 +42,8 @@ export default function StandingsScreen() {
   
   const { standings, league } = currentDashboard;
   const playoffSpots = 4;
-  const weeksRemaining = league.season_length_weeks - league.current_week + 1;
+  // Calculate weeks remaining (not including current week)
+  const weeksRemaining = league.season_length_weeks - league.current_week;
   const isNearPlayoffs = weeksRemaining <= 2;
   
   return (

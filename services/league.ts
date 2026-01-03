@@ -519,14 +519,19 @@ function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: num
   // Week N starts on startDate + (N-1) * 7 days
   const weekStart = new Date(start.getTime() + ((currentWeek - 1) * 7 * 24 * 60 * 60 * 1000));
   
-  // Scoring week ends on Saturday (5 days after Monday)
+  // Scoring week ends on Saturday at end of day (5 days after Monday)
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 5);
   weekEnd.setHours(23, 59, 59, 999);
   
   const now = new Date();
   const diffTime = weekEnd.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Use Math.floor instead of Math.ceil so that:
+  // - Saturday shows as "0 days" (ends today)
+  // - Friday shows as "1 day" (ends tomorrow)
+  // - etc.
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
   return Math.max(0, diffDays);
 }

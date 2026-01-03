@@ -205,6 +205,7 @@ export function getWeekNumber(startDate: Date | string, currentDate: Date = new 
 
 /**
  * Get days remaining in week
+ * Uses Math.floor so that the last day of the week shows as "0 days" (ends today)
  */
 export function getDaysRemainingInWeek(startDate: Date | string, weekNumber: number): number {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
@@ -214,7 +215,8 @@ export function getDaysRemainingInWeek(startDate: Date | string, weekNumber: num
   
   const now = new Date();
   const diffMs = weekEnd.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  // Use Math.floor instead of Math.ceil so Saturday shows as "0 days"
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
   return Math.max(0, diffDays);
 }
