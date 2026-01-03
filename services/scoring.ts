@@ -258,6 +258,11 @@ export function getScoringRules(config?: typeof DEFAULT_SCORING_CONFIG): { metri
       icon: '💪',
     },
     {
+      metric: 'Stand Hours',
+      rule: `${scoringConfig.POINTS_PER_STAND_HOUR} points per hour stood`,
+      icon: '🧑‍💼',
+    },
+    {
       metric: 'Distance',
       rule: `${scoringConfig.POINTS_PER_MILE} points per mile`,
       icon: '🏃',

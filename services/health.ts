@@ -355,7 +355,7 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
         calories: 0,
         distance: 0,
         workouts: 0,
-        standHours: 0
+        standHours: 0,
       });
     }
   }
@@ -387,7 +387,7 @@ export async function getHealthDataRange(startDate: Date, endDate: Date): Promis
         calories: 0,
         distance: 0,
         workouts: 0,
-        standHours: 0
+        standHours: 0,
       });
     }
     current.setDate(current.getDate() + 1);

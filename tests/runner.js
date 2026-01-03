@@ -103,7 +103,7 @@ function runScoringValidation() {
 
   // Test zero values
   try {
-    const actualPoints = calculatePoints({ steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 });
+    const actualPoints = calculatePoints({ steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 });
     results.push({
       name: 'Zero Values',
       passed: actualPoints === 0,

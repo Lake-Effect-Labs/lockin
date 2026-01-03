@@ -110,19 +110,21 @@ test('Scoring', 'A1 - Basic scoring with typical values', () => {
     sleepHours: 8,
     calories: 600,
     workouts: 2,
+    standHours: 10,
     distance: 4,
   };
-  
+
   // Expected:
   // Steps: 10000/1000 * 1 = 10
   // Sleep: 8 * 2 = 16
   // Calories: 600/100 * 5 = 30
-  // Workouts: 2 * 20 = 40
+  // Workouts: 2 * 0.2 = 0.4
+  // StandHours: 10 * 5 = 50
   // Distance: 4 * 3 = 12
-  // Total: 108
-  
+  // Total: 118.4
+
   const points = calculatePoints(metrics);
-  assertEqual(points, 108, 'Basic scoring should equal 108');
+  assertClose(points, 118.4, 0.1);
 });
 
 // Test A2: Zero Values
@@ -132,9 +134,10 @@ test('Scoring', 'A2 - Zero values return zero points', () => {
     sleepHours: 0,
     calories: 0,
     workouts: 0,
+    standHours: 0,
     distance: 0,
   };
-  
+
   const points = calculatePoints(metrics);
   assertEqual(points, 0, 'Zero metrics should return 0 points');
 });
@@ -146,12 +149,13 @@ test('Scoring', 'A3 - High values stress test', () => {
     sleepHours: 6.5,
     calories: 1200,
     workouts: 3,
+    standHours: 12,
     distance: 10,
   };
-  
-  // Steps: 30 + Sleep: 13 + Calories: 60 + Workouts: 60 + Distance: 30 = 193
+
+  // Steps: 30 + Sleep: 13 + Calories: 60 + Workouts: 0.6 + StandHours: 60 + Distance: 30 = 193.6
   const points = calculatePoints(metrics);
-  assertEqual(points, 193, 'High values should calculate correctly');
+  assertClose(points, 193.6, 0.1);
 });
 
 // Test A4: Decimal Precision
@@ -161,12 +165,13 @@ test('Scoring', 'A4 - Decimal precision handling', () => {
     sleepHours: 7.5,
     calories: 350,
     workouts: 1,
+    standHours: 8,
     distance: 3.5,
   };
-  
-  // Steps: 7.5 + Sleep: 15 + Calories: 17.5 + Workouts: 20 + Distance: 10.5 = 70.5
+
+  // Steps: 7.5 + Sleep: 15 + Calories: 17.5 + Workouts: 0.2 + StandHours: 40 + Distance: 10.5 = 90.7
   const points = calculatePoints(metrics);
-  assertClose(points, 70.5, 0.01);
+  assertClose(points, 90.7, 0.1);
 });
 
 // Test A5: Null/NaN Handling
@@ -176,12 +181,13 @@ test('Scoring', 'A5 - Null/NaN values treated as zero', () => {
     sleepHours: undefined as any,
     calories: null as any,
     workouts: 1,
+    standHours: 2,
     distance: 2,
   };
-  
-  // Only workouts (20) and distance (6) should count
+
+  // Only workouts (0.2) + standHours (10) + distance (6) should count = 16.2
   const points = calculatePoints(metrics);
-  assertEqual(points, 26, 'NaN/null should be treated as 0');
+  assertClose(points, 16.2, 0.1);
 });
 
 // Test A6: Negative Values Protection
@@ -191,9 +197,10 @@ test('Scoring', 'A6 - Negative values clamped to zero', () => {
     sleepHours: -5,
     calories: -100,
     workouts: -2,
+    standHours: -3,
     distance: -3,
   };
-  
+
   const points = calculatePoints(metrics);
   assertEqual(points, 0, 'Negative values should be clamped to 0');
 });
@@ -205,14 +212,15 @@ test('Scoring', 'A7 - Points breakdown matches total', () => {
     sleepHours: 7,
     calories: 500,
     workouts: 2,
+    standHours: 10,
     distance: 5,
   };
-  
+
   const breakdown = getPointsBreakdown(metrics);
-  const sumOfParts = breakdown.stepsPoints + breakdown.sleepPoints + 
-                     breakdown.caloriesPoints + breakdown.workoutsPoints + 
-                     breakdown.distancePoints;
-  
+  const sumOfParts = breakdown.stepsPoints + breakdown.sleepPoints +
+                     breakdown.caloriesPoints + breakdown.workoutsPoints +
+                     breakdown.standHoursPoints + breakdown.distancePoints;
+
   assertClose(breakdown.totalPoints, sumOfParts, 0.01);
 });
 
@@ -223,13 +231,13 @@ test('Scoring', 'A7 - Points breakdown matches total', () => {
 // Test B1: Daily Steps Aggregation
 test('Weekly', 'B1 - Daily steps aggregate correctly', () => {
   const days: FitnessMetrics[] = [
-    { steps: 8000, sleepHours: 7, calories: 300, workouts: 0, distance: 3 },
-    { steps: 12000, sleepHours: 8, calories: 400, workouts: 1, distance: 5 },
-    { steps: 6000, sleepHours: 6, calories: 200, workouts: 0, distance: 2 },
-    { steps: 10000, sleepHours: 7.5, calories: 350, workouts: 1, distance: 4 },
-    { steps: 9000, sleepHours: 8, calories: 300, workouts: 0, distance: 3.5 },
-    { steps: 15000, sleepHours: 9, calories: 500, workouts: 2, distance: 6 },
-    { steps: 5000, sleepHours: 7, calories: 250, workouts: 0, distance: 2 },
+    { steps: 8000, sleepHours: 7, calories: 300, workouts: 0, standHours: 8, distance: 3 },
+    { steps: 12000, sleepHours: 8, calories: 400, workouts: 1, standHours: 10, distance: 5 },
+    { steps: 6000, sleepHours: 6, calories: 200, workouts: 0, standHours: 6, distance: 2 },
+    { steps: 10000, sleepHours: 7.5, calories: 350, workouts: 1, standHours: 9, distance: 4 },
+    { steps: 9000, sleepHours: 8, calories: 300, workouts: 0, standHours: 8, distance: 3.5 },
+    { steps: 15000, sleepHours: 9, calories: 500, workouts: 2, standHours: 12, distance: 6 },
+    { steps: 5000, sleepHours: 7, calories: 250, workouts: 0, standHours: 5, distance: 2 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -239,13 +247,13 @@ test('Weekly', 'B1 - Daily steps aggregate correctly', () => {
 // Test B2: Sleep Hours Aggregation
 test('Weekly', 'B2 - Sleep hours aggregate correctly', () => {
   const days: FitnessMetrics[] = [
-    { steps: 0, sleepHours: 7, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 6.5, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 7.5, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 9, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 5.5, calories: 0, workouts: 0, distance: 0 },
+    { steps: 0, sleepHours: 7, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 6.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 7.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 8, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 9, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 5.5, calories: 0, workouts: 0, standHours: 0, distance: 0 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -255,13 +263,13 @@ test('Weekly', 'B2 - Sleep hours aggregate correctly', () => {
 // Test B3: Workouts Aggregate as Integers
 test('Weekly', 'B3 - Workouts aggregate as integers', () => {
   const days: FitnessMetrics[] = [
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 2, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, distance: 0 },
-    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 2, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 1, standHours: 0, distance: 0 },
+    { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 },
   ];
   
   const totals = aggregateWeeklyMetrics(days);
@@ -275,6 +283,7 @@ test('Weekly', 'B4 - Empty array returns zero totals', () => {
   assertEqual(totals.sleepHours, 0);
   assertEqual(totals.calories, 0);
   assertEqual(totals.workouts, 0);
+  assertEqual(totals.standHours, 0);
   assertEqual(totals.distance, 0);
 });
 
@@ -285,6 +294,7 @@ test('Weekly', 'B5 - Weekly projection accuracy', () => {
     sleepHours: 21,
     calories: 900,
     workouts: 3,
+    standHours: 24,
     distance: 12,
   };
   
@@ -565,6 +575,7 @@ test('Edge Cases', 'E4 - Very large step counts', () => {
     sleepHours: 10,
     calories: 5000,
     workouts: 10,
+    standHours: 16,
     distance: 50,
   };
   

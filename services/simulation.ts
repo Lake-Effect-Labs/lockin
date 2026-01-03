@@ -34,15 +34,17 @@ export function runScoringTests(): TestResult[] {
     sleepHours: 8,
     calories: 600,
     workouts: 2,
+    standHours: 10,
     distance: 4,
   };
   const testA1Expected = {
     stepsPoints: 10,
     sleepPoints: 16,
     caloriesPoints: 30,
-    workoutsPoints: 40,
+    workoutsPoints: 0.4,
+    standHoursPoints: 50,
     distancePoints: 12,
-    totalPoints: 108,
+    totalPoints: 118.4,
   };
   const testA1Actual = getPointsBreakdown(testA1Input);
   results.push({
@@ -58,6 +60,7 @@ export function runScoringTests(): TestResult[] {
     sleepHours: 0,
     calories: 0,
     workouts: 0,
+    standHours: 0,
     distance: 0,
   };
   const testA2Actual = calculatePoints(testA2Input);
@@ -74,15 +77,17 @@ export function runScoringTests(): TestResult[] {
     sleepHours: 6.5,
     calories: 1200,
     workouts: 3,
+    standHours: 12,
     distance: 10,
   };
   const testA3Expected = {
     stepsPoints: 30,
     sleepPoints: 13,
     caloriesPoints: 60,
-    workoutsPoints: 60,
+    workoutsPoints: 0.6,
+    standHoursPoints: 60,
     distancePoints: 30,
-    totalPoints: 193,
+    totalPoints: 193.6,
   };
   const testA3Actual = getPointsBreakdown(testA3Input);
   results.push({
@@ -134,10 +139,10 @@ export function runWeeklyAccumulationTests(): TestResult[] {
   
   // Test aggregateWeeklyMetrics function
   const weeklyData: FitnessMetrics[] = [
-    { steps: 5000, sleepHours: 7, calories: 200, workouts: 0, distance: 2 },
-    { steps: 8000, sleepHours: 8, calories: 300, workouts: 1, distance: 3 },
-    { steps: 12000, sleepHours: 8.5, calories: 400, workouts: 2, distance: 5 },
-    { steps: 3000, sleepHours: 6, calories: 100, workouts: 0, distance: 1 },
+    { steps: 5000, sleepHours: 7, calories: 200, workouts: 0, standHours: 6, distance: 2 },
+    { steps: 8000, sleepHours: 8, calories: 300, workouts: 1, standHours: 8, distance: 3 },
+    { steps: 12000, sleepHours: 8.5, calories: 400, workouts: 2, standHours: 10, distance: 5 },
+    { steps: 3000, sleepHours: 6, calories: 100, workouts: 0, standHours: 4, distance: 1 },
   ];
   const aggregated = aggregateWeeklyMetrics(weeklyData);
   results.push({
@@ -435,6 +440,7 @@ export function runEdgeCaseTests(): TestResult[] {
     sleepHours: 0, // Missing/null treated as 0
     calories: 200,
     workouts: 0,
+    standHours: 0,
     distance: 0,
   };
   const nullHandlingScore = calculatePoints(metricsWithNull);
@@ -462,13 +468,15 @@ export function runEdgeCaseTests(): TestResult[] {
     sleepHours: undefined as any,
     calories: null as any,
     workouts: 1,
+    standHours: 2,
     distance: 2,
   };
   const nanHandlingScore = calculatePoints(metricsWithNaN);
+  // 0.2 (workout) + 10 (standHours) + 6 (distance) = 16.2
   results.push({
     name: 'F5 - NaN/null/undefined handling',
-    passed: !isNaN(nanHandlingScore) && nanHandlingScore === 26, // 20 (workout) + 6 (distance)
-    expected: 26,
+    passed: !isNaN(nanHandlingScore) && Math.abs(nanHandlingScore - 16.2) < 0.1,
+    expected: 16.2,
     actual: nanHandlingScore,
   });
   
@@ -478,6 +486,7 @@ export function runEdgeCaseTests(): TestResult[] {
     sleepHours: -5,
     calories: -100,
     workouts: -2,
+    standHours: -3,
     distance: -3,
   };
   const negativeHandlingScore = calculatePoints(metricsWithNegative);
@@ -490,9 +499,9 @@ export function runEdgeCaseTests(): TestResult[] {
   
   // TEST F7 — Weekly aggregation with null days
   const weekWithNulls: FitnessMetrics[] = [
-    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, distance: 2 },
+    { steps: 5000, sleepHours: 7, calories: 200, workouts: 1, standHours: 6, distance: 2 },
     null as any, // Missing day
-    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, distance: 3 },
+    { steps: 8000, sleepHours: 8, calories: 300, workouts: 0, standHours: 8, distance: 3 },
   ];
   const aggregatedWithNulls = aggregateWeeklyMetrics(weekWithNulls);
   results.push({
@@ -508,6 +517,7 @@ export function runEdgeCaseTests(): TestResult[] {
     sleepHours: 7.5,
     calories: 450,
     workouts: 2,
+    standHours: 10,
     distance: 5.5,
   };
   const breakdown = getPointsBreakdown(testMetrics);
