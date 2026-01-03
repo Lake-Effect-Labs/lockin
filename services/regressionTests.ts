@@ -134,14 +134,15 @@ export function runScoringRegressionTests(): TestResult[] {
     sleepHours: 8,
     calories: 600,
     workouts: 2,
+    standHours: 10,
     distance: 4,
   };
-  
+
   const breakdown = getPointsBreakdown(metrics);
   const directCalc = calculatePoints(metrics);
-  const breakdownTotal = breakdown.stepsPoints + breakdown.sleepPoints + 
-                         breakdown.caloriesPoints + breakdown.workoutsPoints + 
-                         breakdown.distancePoints;
+  const breakdownTotal = breakdown.stepsPoints + breakdown.sleepPoints +
+                         breakdown.caloriesPoints + breakdown.workoutsPoints +
+                         breakdown.standHoursPoints + breakdown.distancePoints;
   
   results.push({
     name: 'Points Breakdown Consistency',
@@ -160,6 +161,7 @@ export function runScoringRegressionTests(): TestResult[] {
     sleepHours: 0,
     calories: 0,
     workouts: 0,
+    standHours: 0,
     distance: 0,
   };
   const zeroScore = calculatePoints(zeroMetrics);
@@ -177,6 +179,7 @@ export function runScoringRegressionTests(): TestResult[] {
     sleepHours: undefined as any,
     calories: 200,
     workouts: 1,
+    standHours: 2,
     distance: 2,
   };
   const nullScore = calculatePoints(nullMetrics);
