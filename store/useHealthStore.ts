@@ -44,6 +44,7 @@ interface HealthState {
   // Actions
   initialize: () => Promise<void>;
   requestPermissions: () => Promise<boolean>;
+  recheckPermissions: () => Promise<void>;
   syncTodayData: () => Promise<DailyHealthData | null>;
   syncWeekData: () => Promise<DailyHealthData[]>;
   syncToLeagues: (userId: string) => Promise<void>;
@@ -159,6 +160,28 @@ export const useHealthStore = create<HealthState>()(
         }
       },
 
+      // Re-check health permissions (call on app focus)
+      recheckPermissions: async () => {
+        try {
+          const { fakeMode } = get();
+          
+          if (fakeMode || !isHealthAvailable()) {
+            return;
+          }
+          
+          const permissions = await checkHealthPermissions();
+          set({ permissions });
+          
+          // If permissions were granted, try to sync data
+          const hasAnyPermission = Object.values(permissions).some(p => p);
+          if (hasAnyPermission && !get().isLoading) {
+            await get().syncWeekData();
+          }
+        } catch (error: any) {
+          console.error('[Health Store] Recheck permissions error:', error);
+        }
+      },
+
       // Sync today's health data
       syncTodayData: async () => {
         try {
@@ -175,14 +198,31 @@ export const useHealthStore = create<HealthState>()(
               ...metrics,
             };
           } else {
-            // Get real health data
-            data = await getDailyHealthData(new Date());
+            // Get real health data - will throw error if permissions denied or query fails
+            try {
+              data = await getDailyHealthData(new Date());
+            } catch (healthError: any) {
+              // Check if it's a permission issue
+              if (healthError.message?.includes('not available') || healthError.message?.includes('permission')) {
+                set({ 
+                  error: 'HealthKit permissions required. Please grant access in Settings → Health → Data Access → Lock-In',
+                  isLoading: false 
+                });
+              } else {
+                set({ 
+                  error: `Failed to sync health data: ${healthError.message}`,
+                  isLoading: false 
+                });
+              }
+              return null;
+            }
           }
           
           set({
             todayData: data,
             lastSyncedAt: new Date().toISOString(),
             isLoading: false,
+            error: null,
           });
           
           return data;
@@ -218,8 +258,24 @@ export const useHealthStore = create<HealthState>()(
             }
             // Fake data stored for league syncing
           } else {
-            // Get real health data
-            data = await getCurrentWeekHealthData();
+            // Get real health data - will throw error if permissions denied or query fails
+            try {
+              data = await getCurrentWeekHealthData();
+            } catch (healthError: any) {
+              // Check if it's a permission issue
+              if (healthError.message?.includes('not available') || healthError.message?.includes('permission')) {
+                set({ 
+                  error: 'HealthKit permissions required. Please grant access in Settings → Health → Data Access → Lock-In',
+                  isLoading: false 
+                });
+              } else {
+                set({ 
+                  error: `Failed to sync health data: ${healthError.message}`,
+                  isLoading: false 
+                });
+              }
+              return [];
+            }
           }
           
           // Calculate totals
@@ -233,6 +289,7 @@ export const useHealthStore = create<HealthState>()(
             todayData: data[data.length - 1] || null,
             lastSyncedAt: new Date().toISOString(),
             isLoading: false,
+            error: null,
           });
           
           return data;

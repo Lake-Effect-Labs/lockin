@@ -6,6 +6,8 @@ import {
   queryQuantitySamples,
   queryCategorySamples,
   queryWorkoutSamples,
+  authorizationStatusFor,
+  AuthorizationStatus,
 } from '@kingstinct/react-native-healthkit';
 
 // ============================================
@@ -29,6 +31,22 @@ export interface DailyHealthData extends FitnessMetrics {
 
 // Check if we're in Expo Go (which doesn't support HealthKit)
 const isExpoGo = Constants?.executionEnvironment === 'storeClient';
+
+/**
+ * Get UTC start of day for a date
+ * Ensures consistent day boundaries across all timezones
+ */
+function getUTCStartOfDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+}
+
+/**
+ * Get UTC end of day for a date
+ * Ensures consistent day boundaries across all timezones
+ */
+function getUTCEndOfDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+}
 
 /**
  * Initialize health data access (iOS only)
@@ -79,13 +97,14 @@ export function isHealthAvailable(): boolean {
  * Get daily steps for a date
  */
 export async function getDailySteps(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
   try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
+    // Use UTC boundaries for consistent day calculation across timezones
+    const from = getUTCStartOfDay(date);
+    const to = getUTCEndOfDay(date);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
       limit: 10000,
@@ -99,7 +118,7 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     return 0;
   } catch (err: any) {
     console.error('[Health] Steps error:', err?.message);
-    return 0;
+    throw new Error(`Failed to fetch steps: ${err?.message || 'Unknown error'}`);
   }
 }
 
@@ -107,15 +126,17 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
  * Get sleep hours for a date
  */
 export async function getDailySleep(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
   try {
-    // Look at sleep from the night before
-    const from = new Date(date);
-    from.setDate(from.getDate() - 1);
-    from.setHours(18, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
+    // Look at sleep from the night before (18:00 previous day to end of current day)
+    // Use UTC for consistency across timezones
+    const previousDay = new Date(date);
+    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+    const from = new Date(Date.UTC(previousDay.getUTCFullYear(), previousDay.getUTCMonth(), previousDay.getUTCDate(), 18, 0, 0, 0));
+    const to = getUTCEndOfDay(date);
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
       limit: 10000,
@@ -137,7 +158,7 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     return 0;
   } catch (err: any) {
     console.error('[Health] Sleep error:', err?.message);
-    return 0;
+    throw new Error(`Failed to fetch sleep data: ${err?.message || 'Unknown error'}`);
   }
 }
 
@@ -145,13 +166,14 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
  * Get active calories for a date
  */
 export async function getDailyCalories(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
   try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
+    // Use UTC boundaries for consistent day calculation across timezones
+    const from = getUTCStartOfDay(date);
+    const to = getUTCEndOfDay(date);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
       unit: 'kilocalorie',
@@ -166,7 +188,7 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
     return 0;
   } catch (err: any) {
     console.error('[Health] Calories error:', err?.message);
-    return 0;
+    throw new Error(`Failed to fetch calories: ${err?.message || 'Unknown error'}`);
   }
 }
 
@@ -174,13 +196,14 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
  * Get distance walked/run for a date (in miles)
  */
 export async function getDailyDistance(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
   try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
+    // Use UTC boundaries for consistent day calculation across timezones
+    const from = getUTCStartOfDay(date);
+    const to = getUTCEndOfDay(date);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', {
       limit: 10000,
@@ -194,7 +217,7 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
     return 0;
   } catch (err: any) {
     console.error('[Health] Distance error:', err?.message);
-    return 0;
+    throw new Error(`Failed to fetch distance: ${err?.message || 'Unknown error'}`);
   }
 }
 
@@ -202,13 +225,14 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
  * Get workout minutes for a date
  */
 export async function getDailyWorkouts(date: Date = new Date()): Promise<number> {
-  if (!isHealthAvailable()) return 0;
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
   try {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(date);
-    to.setHours(23, 59, 59, 999);
+    // Use UTC boundaries for consistent day calculation across timezones
+    const from = getUTCStartOfDay(date);
+    const to = getUTCEndOfDay(date);
 
     const samples = await queryWorkoutSamples({
       limit: 10000,
@@ -232,7 +256,7 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
     return 0;
   } catch (err: any) {
     console.error('[Health] Workouts error:', err?.message);
-    return 0;
+    throw new Error(`Failed to fetch workouts: ${err?.message || 'Unknown error'}`);
   }
 }
 
@@ -247,40 +271,74 @@ export async function getDailyStandHours(date: Date = new Date()): Promise<numbe
 
 /**
  * Get all daily fitness metrics
+ * Throws error if HealthKit is unavailable or queries fail
  */
 export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHealthData> {
-  const [steps, sleep, calories, standHours, workouts, distance] = await Promise.all([
-    getDailySteps(date),
-    getDailySleep(date),
-    getDailyCalories(date),
-    getDailyStandHours(date),
-    getDailyWorkouts(date),
-    getDailyDistance(date),
-  ]);
+  if (!isHealthAvailable()) {
+    throw new Error('HealthKit is not available on this device');
+  }
 
-  return {
-    date: date.toISOString().split('T')[0],
-    steps,
-    sleepHours: sleep,
-    calories,
-    standHours,
-    workouts,
-    distance,
-  };
+  try {
+    const [steps, sleep, calories, standHours, workouts, distance] = await Promise.all([
+      getDailySteps(date),
+      getDailySleep(date),
+      getDailyCalories(date),
+      getDailyStandHours(date),
+      getDailyWorkouts(date),
+      getDailyDistance(date),
+    ]);
+
+    return {
+      date: date.toISOString().split('T')[0],
+      steps,
+      sleepHours: sleep,
+      calories,
+      standHours,
+      workouts,
+      distance,
+    };
+  } catch (error: any) {
+    console.error('[Health] getDailyMetrics error:', error?.message);
+    throw error; // Re-throw to let caller handle
+  }
 }
 
 /**
  * Check health permissions status
+ * Uses HealthKit's authorizationStatusFor to check actual permission state
  */
 export async function checkHealthPermissions(): Promise<HealthPermissions> {
-  return {
-    steps: false,
-    sleep: false,
-    calories: false,
-    workouts: false,
-    distance: false,
-    standHours: false
-  };
+  if (!isHealthAvailable()) {
+    return {
+      steps: false,
+      sleep: false,
+      calories: false,
+      workouts: false,
+      distance: false,
+      standHours: false
+    };
+  }
+  
+  try {
+    return {
+      steps: authorizationStatusFor('HKQuantityTypeIdentifierStepCount') === AuthorizationStatus.sharingAuthorized,
+      sleep: authorizationStatusFor('HKCategoryTypeIdentifierSleepAnalysis') === AuthorizationStatus.sharingAuthorized,
+      calories: authorizationStatusFor('HKQuantityTypeIdentifierActiveEnergyBurned') === AuthorizationStatus.sharingAuthorized,
+      workouts: authorizationStatusFor('HKWorkoutTypeIdentifier') === AuthorizationStatus.sharingAuthorized,
+      distance: authorizationStatusFor('HKQuantityTypeIdentifierDistanceWalkingRunning') === AuthorizationStatus.sharingAuthorized,
+      standHours: false, // Disabled - requires Apple Watch
+    };
+  } catch (error: any) {
+    console.error('[Health] Permission check error:', error?.message);
+    return {
+      steps: false,
+      sleep: false,
+      calories: false,
+      workouts: false,
+      distance: false,
+      standHours: false
+    };
+  }
 }
 
 /**
