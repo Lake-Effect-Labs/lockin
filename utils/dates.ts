@@ -2,6 +2,27 @@
 // DATE UTILITIES
 // Lock-In Fitness Competition App
 // ============================================
+//
+// TIMEZONE STRATEGY (Updated: January 5, 2026)
+// ============================================
+// All competition week boundaries are calculated in UTC for determinism.
+// This ensures that all users in a league have the same deadline regardless
+// of their local timezone.
+//
+// Week Boundaries (UTC):
+// - Week N starts: start_date + ((N-1) * 7 days) at 00:00:00 UTC
+// - Week N ends: start_date + (N * 7 days) - 1 second at 23:59:59 UTC
+//
+// Critical Functions Using UTC:
+// - getWeekNumber(): Calculates current week using UTC dates
+// - getDaysRemainingInWeek(): Calculates days remaining using UTC timestamps
+// - isResultsDay(): Checks if current UTC day is Sunday
+//
+// Display Functions (Local Time):
+// - formatDate(), formatTime(), formatDateTime(): Display in user's local timezone
+// - All other formatting functions use local time for user-friendly display
+//
+// ============================================
 
 /**
  * Format date to readable string
@@ -171,24 +192,23 @@ export function getEndOfWeek(date: Date = new Date()): Date {
  * Get week number from start date (Monday-Sunday weeks)
  * Returns the current week number based on calendar weeks since start_date
  * NOTE: startDate should always be a Monday (league start date)
+ * USES UTC for deterministic week boundaries across all timezones
  */
 export function getWeekNumber(startDate: Date | string, currentDate: Date = new Date()): number {
   const start = typeof startDate === 'string' ? new Date(startDate) : new Date(startDate);
   const current = new Date(currentDate);
   
-  // Normalize to start of day
-  start.setHours(0, 0, 0, 0);
-  current.setHours(0, 0, 0, 0);
-  
-  // startDate should already be a Monday, so use it directly
-  // No need to call getStartOfWeekMonday() on it
+  // Use UTC for deterministic week calculations
+  // Create UTC timestamps at start of day (00:00:00 UTC)
+  const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const currentUTC = Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate());
   
   // Calculate which week we're currently in:
-  // Week 1: startDate (Monday) through startDate + 6 (Sunday)
-  // Week 2: startDate + 7 (Monday) through startDate + 13 (Sunday)
+  // Week 1: startDate (Monday 00:00 UTC) through startDate + 6 days (Sunday 23:59 UTC)
+  // Week 2: startDate + 7 days (Monday 00:00 UTC) through startDate + 13 days (Sunday 23:59 UTC)
   // etc.
   
-  const diffMs = current.getTime() - start.getTime();
+  const diffMs = currentUTC - startUTC;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
   // If current date is before start date, we're in week 0 (not started yet)
@@ -206,15 +226,21 @@ export function getWeekNumber(startDate: Date | string, currentDate: Date = new 
 /**
  * Get days remaining in week
  * Uses Math.floor so that the last day of the week shows as "0 days" (ends today)
+ * USES UTC for deterministic week boundaries across all timezones
  */
 export function getDaysRemainingInWeek(startDate: Date | string, weekNumber: number): number {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  // Week N ends at: start_date + (N * 7) days
-  // Use getTime() to avoid date mutation issues
-  const weekEnd = new Date(start.getTime() + (weekNumber * 7 * 24 * 60 * 60 * 1000));
   
-  const now = new Date();
-  const diffMs = weekEnd.getTime() - now.getTime();
+  // Calculate week end in UTC
+  // Week N ends at: start_date + (N * 7 days) - 1 second
+  // But for day counting, we use start of the day after (start_date + N * 7 days)
+  const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const weekEndUTC = startUTC + (weekNumber * 7 * 24 * 60 * 60 * 1000);
+  
+  // Get current time in UTC
+  const nowUTC = Date.now();
+  
+  const diffMs = weekEndUTC - nowUTC;
   // Use Math.floor instead of Math.ceil so Saturday shows as "0 days"
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
@@ -264,9 +290,10 @@ export function isFuture(date: Date | string): boolean {
  * Check if today is Results Day (Sunday)
  * Results Day is when users can view final matchup results and preview next opponent
  * Scoring period is Mon-Sat, Sunday is for reviewing results
+ * USES UTC to ensure consistent Results Day across all timezones
  */
 export function isResultsDay(date: Date = new Date()): boolean {
-  return date.getDay() === 0; // 0 = Sunday
+  return date.getUTCDay() === 0; // 0 = Sunday in UTC
 }
 
 /**
