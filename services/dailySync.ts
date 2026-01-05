@@ -171,7 +171,6 @@ export async function syncWeeklyToLeagues(userId: string): Promise<void> {
           sleep_hours: weeklyMetrics.sleepHours,
           calories: weeklyMetrics.calories,
           workouts: weeklyMetrics.workouts,
-          standHours: weeklyMetrics.standHours || 0,
           distance: weeklyMetrics.distance,
         }
       );
@@ -193,7 +192,7 @@ export async function getWeeklySyncStatus(): Promise<WeeklySyncStatus> {
   
   const weeklyMetrics = dailyData.length > 0
     ? aggregateWeeklyMetrics(dailyData.map(d => d.metrics))
-    : { steps: 0, sleepHours: 0, calories: 0, workouts: 0, standHours: 0, distance: 0 };
+    : { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 };
   
   return {
     weekNumber: getCurrentWeekNumber(),

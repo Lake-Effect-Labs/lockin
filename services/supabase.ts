@@ -684,7 +684,6 @@ export async function upsertWeeklyScore(
     sleep_hours: number;
     calories: number;
     workouts: number;
-    standHours?: number;
     distance: number;
   }
 ): Promise<WeeklyScore> {
@@ -698,7 +697,7 @@ export async function upsertWeeklyScore(
       sleep_hours: metrics.sleep_hours,
       calories: metrics.calories,
       workouts: metrics.workouts,
-      stand_hours: metrics.standHours || 0,
+      stand_hours: 0, // Stand hours removed - always 0
       distance: metrics.distance,
       last_synced_at: new Date().toISOString(),
     }, {

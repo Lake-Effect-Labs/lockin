@@ -90,7 +90,6 @@ export default function HomeScreen() {
     { icon: '😴', value: `${todayData.sleepHours.toFixed(1)}h`, label: 'Sleep', color: colors.secondary[500] },
     { icon: '🔥', value: todayData.calories.toLocaleString(), label: 'Calories', color: '#E74C3C' },
     { icon: '💪', value: `${todayData.workouts}m`, label: 'Workout Mins', color: colors.accent[500] },
-    { icon: '🧑‍💼', value: `${todayData.standHours}h`, label: 'Stand Hours', color: '#9B59B6' },
     { icon: '🏃', value: `${todayData.distance.toFixed(1)}`, label: 'Miles', color: '#3498DB' },
   ] : [];
   

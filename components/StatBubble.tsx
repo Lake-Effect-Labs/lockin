@@ -132,8 +132,6 @@ interface PointsBreakdownProps {
   caloriesPoints: number;
   workouts: number;
   workoutsPoints: number;
-  standHours: number;
-  standHoursPoints: number;
   distance: number;
   distancePoints: number;
   totalPoints: number;
@@ -149,8 +147,6 @@ export function PointsBreakdown({
   caloriesPoints,
   workouts,
   workoutsPoints,
-  standHours,
-  standHoursPoints,
   distance,
   distancePoints,
   totalPoints,

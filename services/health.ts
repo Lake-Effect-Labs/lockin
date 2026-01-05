@@ -22,7 +22,6 @@ export interface HealthPermissions {
   calories: boolean;
   workouts: boolean;
   distance: boolean;
-  standHours: boolean;
 }
 
 export interface DailyHealthData extends FitnessMetrics {
@@ -261,15 +260,6 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
 }
 
 /**
- * Get stand hours for a date
- * NOTE: Disabled - always returns 0
- * Stand hours tracking removed due to Apple Watch requirement
- */
-export async function getDailyStandHours(date: Date = new Date()): Promise<number> {
-  return 0; // Disabled - requires Apple Watch
-}
-
-/**
  * Get all daily fitness metrics
  * Throws error if HealthKit is unavailable or queries fail
  */
@@ -279,11 +269,10 @@ export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHea
   }
 
   try {
-    const [steps, sleep, calories, standHours, workouts, distance] = await Promise.all([
+    const [steps, sleep, calories, workouts, distance] = await Promise.all([
       getDailySteps(date),
       getDailySleep(date),
       getDailyCalories(date),
-      getDailyStandHours(date),
       getDailyWorkouts(date),
       getDailyDistance(date),
     ]);
@@ -293,7 +282,6 @@ export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHea
       steps,
       sleepHours: sleep,
       calories,
-      standHours,
       workouts,
       distance,
     };
@@ -315,7 +303,6 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
       calories: false,
       workouts: false,
       distance: false,
-      standHours: false
     };
   }
   
@@ -326,7 +313,6 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
       calories: authorizationStatusFor('HKQuantityTypeIdentifierActiveEnergyBurned') === AuthorizationStatus.sharingAuthorized,
       workouts: authorizationStatusFor('HKWorkoutTypeIdentifier') === AuthorizationStatus.sharingAuthorized,
       distance: authorizationStatusFor('HKQuantityTypeIdentifierDistanceWalkingRunning') === AuthorizationStatus.sharingAuthorized,
-      standHours: false, // Disabled - requires Apple Watch
     };
   } catch (error: any) {
     console.error('[Health] Permission check error:', error?.message);
@@ -336,7 +322,6 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
       calories: false,
       workouts: false,
       distance: false,
-      standHours: false
     };
   }
 }
@@ -355,7 +340,6 @@ export function getFakeHealthData(date: Date = new Date()): DailyHealthData {
     calories: 400 + (seed * 97) % 300,
     distance: 3 + (seed * 53) % 5,
     workouts: (seed * 17) % 2,
-    standHours: 0
   };
 }
 
@@ -401,7 +385,6 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
         calories: 0,
         distance: 0,
         workouts: 0,
-        standHours: 0,
       });
     }
   }
@@ -433,7 +416,6 @@ export async function getHealthDataRange(startDate: Date, endDate: Date): Promis
         calories: 0,
         distance: 0,
         workouts: 0,
-        standHours: 0,
       });
     }
     current.setDate(current.getDate() + 1);
@@ -759,34 +741,6 @@ export async function getRawHealthDebug(): Promise<{
   } catch (e: any) {
     queries.push({
       metric: 'WORKOUTS',
-      queryParams,
-      rawResponse: 'ERROR',
-      sampleCount: 0,
-      firstSample: 'N/A',
-      calculatedValue: 0,
-      error: e.message,
-    });
-  }
-
-  // Test Stand Hours
-  try {
-    const samples = await queryCategorySamples('HKCategoryTypeIdentifierAppleStandHour', {
-      limit: 10000,
-      filter: { date: { startDate: from, endDate: to } },
-    });
-
-    queries.push({
-      metric: 'STAND_HOURS',
-      queryParams,
-      rawResponse: `Array(${samples?.length ?? 0})`,
-      sampleCount: samples?.length ?? 0,
-      firstSample: samples?.[0] ? JSON.stringify(samples[0]).substring(0, 150) : 'none',
-      calculatedValue: samples?.length ?? 0,
-      error: null,
-    });
-  } catch (e: any) {
-    queries.push({
-      metric: 'STAND_HOURS',
       queryParams,
       rawResponse: 'ERROR',
       sampleCount: 0,
