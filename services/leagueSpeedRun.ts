@@ -5,6 +5,7 @@
 
 import { supabase, League, LeagueMember, Matchup, WeeklyScore, upsertWeeklyScore, finalizeWeek, getLeagueMembers, getMatchups, getLeague } from './supabase';
 import { calculatePoints, FitnessMetrics } from './scoring';
+import { generateMatchups, generatePlayoffs } from './leagueEngine';
 
 // ============================================
 // TYPES
@@ -213,11 +214,9 @@ export async function runLeagueSpeedRun(
       success: true,
     });
 
-    const { error: matchupError } = await supabase.rpc('generate_matchups', {
-      p_league_id: leagueId
-    });
-
-    if (matchupError) {
+    try {
+      await generateMatchups(leagueId);
+    } catch (matchupError: any) {
       throw new Error(`Failed to generate matchups: ${matchupError.message}`);
     }
 
@@ -268,10 +267,8 @@ export async function runLeagueSpeedRun(
           .update({ current_week: nextWeek })
           .eq('id', leagueId);
 
-        // Generate matchups for the next week
-        await supabase.rpc('generate_matchups', {
-          p_league_id: leagueId
-        });
+        // Generate matchups for the next week (no-op if already exist)
+        await generateMatchups(leagueId);
       }
 
       // Get standings after week
@@ -331,16 +328,19 @@ export async function runLeagueSpeedRun(
       .eq('id', leagueId);
 
     // Generate playoffs
-    const { error: playoffError } = await supabase.rpc('generate_playoffs', {
-      p_league_id: leagueId,
-    });
+    let playoffError: Error | null = null;
+    try {
+      await generatePlayoffs(leagueId);
+    } catch (err: any) {
+      playoffError = err;
+    }
 
     if (playoffError) {
-      // Playoffs might not exist as RPC, simulate manually
+      // Handle case where playoffs can't be generated
       addStep({
         type: 'playoffs',
         title: 'Playoffs Simulated',
-        description: 'Playoff bracket would be generated here',
+        description: `Could not generate playoffs: ${playoffError.message}`,
         success: true,
       });
     } else {

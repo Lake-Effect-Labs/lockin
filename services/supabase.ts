@@ -579,8 +579,9 @@ export async function getLeagueMembers(leagueId: string): Promise<LeagueMember[]
 }
 
 export async function startLeagueSeason(leagueId: string): Promise<void> {
-  const { error } = await supabase.rpc('generate_matchups', { p_league_id: leagueId });
-  if (error) throw error;
+  // Migrated from SQL RPC to TypeScript - business logic now in leagueEngine.ts
+  const { generateMatchups } = await import('./leagueEngine');
+  await generateMatchups(leagueId);
 }
 
 /**
@@ -588,10 +589,9 @@ export async function startLeagueSeason(leagueId: string): Promise<void> {
  * This is called automatically when weeks advance
  */
 export async function generateMatchupsForWeek(leagueId: string, weekNumber?: number): Promise<void> {
-  // The generate_matchups function now handles generating only missing weeks
-  // So we can just call it and it will generate the next week
-  const { error } = await supabase.rpc('generate_matchups', { p_league_id: leagueId });
-  if (error) throw error;
+  // Migrated from SQL RPC to TypeScript - business logic now in leagueEngine.ts
+  const { generateMatchups } = await import('./leagueEngine');
+  await generateMatchups(leagueId);
 }
 
 // ============================================
@@ -647,11 +647,9 @@ export async function updateMatchupScores(
 }
 
 export async function finalizeWeek(leagueId: string, weekNumber: number): Promise<void> {
-  const { error } = await supabase.rpc('finalize_week', {
-    p_league_id: leagueId,
-    p_week: weekNumber,
-  });
-  if (error) throw error;
+  // Migrated from SQL RPC to TypeScript - business logic now in leagueEngine.ts
+  const { finalizeWeek: finalizeWeekEngine } = await import('./leagueEngine');
+  await finalizeWeekEngine(leagueId, weekNumber);
 }
 
 // ============================================
@@ -687,27 +685,9 @@ export async function upsertWeeklyScore(
     distance: number;
   }
 ): Promise<WeeklyScore> {
-  const { data, error } = await supabase
-    .from('weekly_scores')
-    .upsert({
-      league_id: leagueId,
-      user_id: userId,
-      week_number: weekNumber,
-      steps: metrics.steps,
-      sleep_hours: metrics.sleep_hours,
-      calories: metrics.calories,
-      workouts: metrics.workouts,
-      stand_hours: 0, // Stand hours removed - always 0
-      distance: metrics.distance,
-      last_synced_at: new Date().toISOString(),
-    }, {
-      onConflict: 'league_id,user_id,week_number',
-    })
-    .select()
-    .single();
-  
-  if (error) throw error;
-  return data;
+  // Migrated from SQL trigger to TypeScript - calculate points in-app
+  const { upsertWeeklyScoreWithPoints } = await import('./leagueEngine');
+  return upsertWeeklyScoreWithPoints(leagueId, userId, weekNumber, metrics);
 }
 
 export async function getLeagueWeeklyScores(
@@ -741,8 +721,9 @@ export async function getPlayoffs(leagueId: string): Promise<PlayoffMatch[]> {
 }
 
 export async function generatePlayoffs(leagueId: string): Promise<void> {
-  const { error } = await supabase.rpc('generate_playoffs', { p_league_id: leagueId });
-  if (error) throw error;
+  // Migrated from SQL RPC to TypeScript - business logic now in leagueEngine.ts
+  const { generatePlayoffs: generatePlayoffsEngine } = await import('./leagueEngine');
+  await generatePlayoffsEngine(leagueId);
 }
 
 export async function updatePlayoffScores(
@@ -762,8 +743,9 @@ export async function updatePlayoffScores(
 }
 
 export async function finalizePlayoffMatch(playoffId: string): Promise<void> {
-  const { error } = await supabase.rpc('finalize_playoff_match', { p_playoff_id: playoffId });
-  if (error) throw error;
+  // Migrated from SQL RPC to TypeScript - business logic now in leagueEngine.ts
+  const { finalizePlayoffMatch: finalizePlayoffMatchEngine } = await import('./leagueEngine');
+  await finalizePlayoffMatchEngine(playoffId);
 }
 
 // ============================================
