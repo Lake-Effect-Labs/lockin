@@ -65,6 +65,10 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Supabase credentials are not configured. Please check your environment variables.');
           }
           
+          // BUG FIX #10: Ensure valid session before proceeding
+          const { ensureValidSession } = await import('@/services/supabase');
+          await ensureValidSession();
+          
           // Get current session
           const { data: { session } } = await supabase.auth.getSession();
           
@@ -102,7 +106,10 @@ export const useAuthStore = create<AuthState>()(
           }
           
           // Listen for auth changes
+          // BUG FIX #10: Handle TOKEN_REFRESHED event to update session
           supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('[Auth] State change:', event);
+            
             if (event === 'SIGNED_IN' && session?.user) {
               // Profile should be auto-created by database trigger
               let profile = await getProfile(session.user.id);
@@ -120,6 +127,12 @@ export const useAuthStore = create<AuthState>()(
               set({ authUser: session.user, user: profile });
             } else if (event === 'SIGNED_OUT') {
               set({ authUser: null, user: null });
+            } else if (event === 'TOKEN_REFRESHED') {
+              // BUG FIX #10: Token was refreshed, update auth user
+              console.log('[Auth] Token refreshed successfully');
+              if (session?.user) {
+                set({ authUser: session.user });
+              }
             }
           });
         } catch (error: any) {

@@ -105,6 +105,9 @@ export async function generateMatchups(leagueId: string): Promise<void> {
 /**
  * Finalize a week - determine winners and update standings
  * This replaces the SQL function: finalize_week(p_league_id UUID, p_week INTEGER)
+ * 
+ * BUG FIX #2: Prevents double-counting points by checking points_added flag
+ * before updating league_members standings.
  */
 export async function finalizeWeek(leagueId: string, weekNumber: number): Promise<void> {
   // GUARD 1: Check if playoffs have started
@@ -152,6 +155,12 @@ export async function finalizeWeek(leagueId: string, weekNumber: number): Promis
   let matchupsFinalizedCount = 0;
 
   for (const matchup of matchups) {
+    // BUG FIX #2: Skip if points already added (prevents double-counting)
+    if (matchup.points_added) {
+      console.log(`[finalizeWeek] Skipping matchup ${matchup.id} - points already added`);
+      continue;
+    }
+
     // Get scores for both players
     const { data: p1ScoreData } = await supabase
       .from('weekly_scores')
@@ -190,6 +199,24 @@ export async function finalizeWeek(leagueId: string, weekNumber: number): Promis
       isTie = true;
       p1TieDelta = 1;
       p2TieDelta = 1;
+    }
+
+    // BUG FIX #2: Mark points_added FIRST (before updating standings)
+    // This ensures idempotency - if the process crashes after this point,
+    // re-running won't double-count because points_added will be true
+    const { error: pointsAddedError } = await supabase
+      .from('matchups')
+      .update({
+        points_added: true,
+        p1_points_snapshot: p1Score,
+        p2_points_snapshot: p2Score,
+      })
+      .eq('id', matchup.id)
+      .eq('points_added', false); // Only update if not already set
+
+    if (pointsAddedError) {
+      console.error(`[finalizeWeek] Error marking points_added for matchup ${matchup.id}:`, pointsAddedError);
+      continue; // Skip this matchup to prevent potential double-counting
     }
 
     // Update matchup with scores and winner
@@ -248,16 +275,6 @@ export async function finalizeWeek(leagueId: string, weekNumber: number): Promis
         .eq('league_id', leagueId)
         .eq('user_id', matchup.player2_id);
     }
-
-    // Mark points as added (for idempotency tracking)
-    await supabase
-      .from('matchups')
-      .update({
-        points_added: true,
-        p1_points_snapshot: p1Score,
-        p2_points_snapshot: p2Score,
-      })
-      .eq('id', matchup.id);
 
     matchupsFinalizedCount++;
   }

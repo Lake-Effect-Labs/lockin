@@ -147,34 +147,40 @@ export function getEndOfWeekSunday(date: Date = new Date()): Date {
 
 /**
  * Get next Monday from a given date (always returns next Monday, never today)
+ * 
+ * BUG FIX #7: Uses UTC for consistent "next Monday" calculation across all timezones.
+ * This ensures leagues start on the same UTC Monday regardless of user timezone.
  */
 export function getNextMonday(fromDate: Date = new Date()): Date {
-  const today = new Date(fromDate);
-  today.setHours(0, 0, 0, 0);
+  // Use UTC to ensure consistent Monday calculation across timezones
+  const now = fromDate;
+  const utcDay = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   
-  const day = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  
-  // Calculate days until next Monday
+  // Calculate days until next Monday (UTC)
   // If today is Monday (1), return NEXT Monday (+7 days, not today)
   // If today is Tuesday (2), return this coming Monday (+6 days)
   // If today is Sunday (0), return tomorrow Monday (+1 day)
   let daysUntilNextMonday;
-  if (day === 1) {
-    // Today is Monday, so next Monday is 7 days away
+  if (utcDay === 1) {
+    // Today is Monday (UTC), so next Monday is 7 days away
     daysUntilNextMonday = 7;
-  } else if (day === 0) {
-    // Today is Sunday, so next Monday is tomorrow
+  } else if (utcDay === 0) {
+    // Today is Sunday (UTC), so next Monday is tomorrow
     daysUntilNextMonday = 1;
   } else {
-    // Today is Tue-Sat, calculate days to next Monday
-    daysUntilNextMonday = 8 - day;
+    // Today is Tue-Sat (UTC), calculate days to next Monday
+    daysUntilNextMonday = 8 - utcDay;
   }
   
-  const nextMonday = new Date(today);
-  nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-  nextMonday.setHours(0, 0, 0, 0);
+  // Calculate the next Monday in UTC
+  const nextMondayUTC = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + daysUntilNextMonday,
+    0, 0, 0, 0
+  );
   
-  return nextMonday;
+  return new Date(nextMondayUTC);
 }
 
 /**
@@ -192,10 +198,28 @@ export function getEndOfWeek(date: Date = new Date()): Date {
  * Get week number from start date (Monday-Sunday weeks)
  * Returns the current week number based on calendar weeks since start_date
  * NOTE: startDate should always be a Monday (league start date)
- * USES UTC for deterministic week boundaries across all timezones
+ * 
+ * BUG FIX #3: USES UTC for deterministic week boundaries across all timezones.
+ * This ensures LA (UTC-8) and NY (UTC-5) users see the same week number.
+ * The week boundary is at midnight UTC, not local midnight.
  */
 export function getWeekNumber(startDate: Date | string, currentDate: Date = new Date()): number {
-  const start = typeof startDate === 'string' ? new Date(startDate) : new Date(startDate);
+  // Parse start date - if it's a string like "2024-01-08", parse as UTC to avoid timezone shifts
+  let start: Date;
+  if (typeof startDate === 'string') {
+    // Parse ISO date string as UTC (not local time)
+    // "2024-01-08" should be treated as 2024-01-08 00:00:00 UTC
+    if (startDate.includes('T')) {
+      start = new Date(startDate);
+    } else {
+      // Date-only string: parse as UTC
+      const [year, month, day] = startDate.split('-').map(Number);
+      start = new Date(Date.UTC(year, month - 1, day));
+    }
+  } else {
+    start = new Date(startDate);
+  }
+  
   const current = new Date(currentDate);
   
   // Use UTC for deterministic week calculations
@@ -226,10 +250,24 @@ export function getWeekNumber(startDate: Date | string, currentDate: Date = new 
 /**
  * Get days remaining in week
  * Uses Math.floor so that the last day of the week shows as "0 days" (ends today)
- * USES UTC for deterministic week boundaries across all timezones
+ * 
+ * BUG FIX #3: USES UTC for deterministic week boundaries across all timezones.
+ * Parses date-only strings as UTC to prevent timezone shifts.
  */
 export function getDaysRemainingInWeek(startDate: Date | string, weekNumber: number): number {
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+  // Parse start date - if it's a string like "2024-01-08", parse as UTC
+  let start: Date;
+  if (typeof startDate === 'string') {
+    if (startDate.includes('T')) {
+      start = new Date(startDate);
+    } else {
+      // Date-only string: parse as UTC
+      const [year, month, day] = startDate.split('-').map(Number);
+      start = new Date(Date.UTC(year, month - 1, day));
+    }
+  } else {
+    start = new Date(startDate);
+  }
   
   // Calculate week end in UTC
   // Week N ends at: start_date + (N * 7 days) - 1 second

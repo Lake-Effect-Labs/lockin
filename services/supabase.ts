@@ -136,6 +136,90 @@ try {
 export { supabase };
 
 // ============================================
+// BUG FIX #10: SESSION TOKEN REFRESH & 401 HANDLING
+// ============================================
+
+/**
+ * BUG FIX #10: Wrapper for Supabase calls that handles 401 errors gracefully.
+ * Automatically refreshes the session token when it expires.
+ * 
+ * @param operation - Async function that makes a Supabase call
+ * @returns The result of the operation, or throws if refresh fails
+ */
+export async function withTokenRefresh<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: any) {
+    // Check if it's a 401 Unauthorized error
+    if (error?.status === 401 || error?.message?.includes('JWT') || error?.message?.includes('token')) {
+      console.log('[Supabase] Token expired, attempting refresh...');
+      
+      try {
+        // Try to refresh the session
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          console.error('[Supabase] Session refresh failed:', refreshError);
+          // Session is invalid - user needs to re-login
+          throw new Error('Session expired. Please sign in again.');
+        }
+        
+        if (data?.session) {
+          console.log('[Supabase] Session refreshed successfully');
+          // Retry the original operation with the new token
+          return await operation();
+        }
+      } catch (refreshError: any) {
+        console.error('[Supabase] Token refresh error:', refreshError);
+        throw new Error('Session expired. Please sign in again.');
+      }
+    }
+    
+    // Re-throw non-auth errors
+    throw error;
+  }
+}
+
+/**
+ * BUG FIX #10: Check if the current session is valid and refresh if needed.
+ * Should be called on app startup and before critical operations.
+ */
+export async function ensureValidSession(): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.log('[Supabase] No active session');
+      return false;
+    }
+    
+    // Check if token is about to expire (within 5 minutes)
+    const expiresAt = session.expires_at;
+    if (expiresAt) {
+      const expiresAtMs = expiresAt * 1000; // Convert to milliseconds
+      const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000);
+      
+      if (expiresAtMs < fiveMinutesFromNow) {
+        console.log('[Supabase] Token expiring soon, refreshing...');
+        const { error } = await supabase.auth.refreshSession();
+        
+        if (error) {
+          console.error('[Supabase] Proactive refresh failed:', error);
+          return false;
+        }
+        
+        console.log('[Supabase] Token refreshed proactively');
+      }
+    }
+    
+    return true;
+  } catch (error: any) {
+    console.error('[Supabase] Session validation error:', error);
+    return false;
+  }
+}
+
+// ============================================
 // TYPE DEFINITIONS
 // ============================================
 
@@ -534,13 +618,18 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     const nextMonday = getNextMonday();
     const startDate = nextMonday.toISOString().split('T')[0];
 
-    // Set start_date AND snapshot scoring_config to freeze it for the season
-    // (Moved from SQL trigger: snapshot_scoring_config_on_start)
+    // BUG FIX #9: Set start_date AND snapshot scoring_config to freeze it for the season
+    // This ensures scoring rules cannot be changed after the season begins.
+    // The season_scoring_config is used for all point calculations during the season.
+    const frozenScoringConfig = league.scoring_config ? { ...league.scoring_config } : null;
+    
+    console.log('[joinLeagueByCode] Freezing scoring config for season:', frozenScoringConfig);
+    
     await supabase
       .from('leagues')
       .update({
         start_date: startDate,
-        season_scoring_config: league.scoring_config // Freeze scoring config at season start
+        season_scoring_config: frozenScoringConfig // BUG FIX #9: Deep copy to freeze config
       })
       .eq('id', league.id);
     

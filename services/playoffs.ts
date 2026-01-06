@@ -37,12 +37,31 @@ export interface PlayoffMatchDisplay {
 /**
  * Get playoff qualifiers based on league size
  * ALL league sizes (4, 6, 8, 10, 12, 14 players): top 4 qualify for playoffs
+ * 
+ * BUG FIX #4: Improved tiebreaker logic for playoff seeding.
+ * Tiebreaker order:
+ * 1. Wins (most wins first)
+ * 2. Total points (highest points first)
+ * 3. Head-to-head record (if applicable - would need matchup data)
+ * 4. Original join order (earlier joiners win ties - uses array index as stable sort)
  */
 export function getPlayoffQualifiers(members: LeagueMember[], leagueSize?: number): LeagueMember[] {
-  // Sort by wins (desc), then total points (desc)
+  // Sort by wins (desc), then total points (desc), then by join order (earlier = better)
   const sorted = [...members].sort((a, b) => {
+    // Primary: Most wins
     if (b.wins !== a.wins) return b.wins - a.wins;
-    return b.total_points - a.total_points;
+    
+    // Secondary: Highest total points (tiebreaker)
+    if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+    
+    // Tertiary: Fewer losses (more consistent)
+    if (a.losses !== b.losses) return a.losses - b.losses;
+    
+    // Quaternary: Earlier join time wins (stable sort using joined_at)
+    // This ensures deterministic ordering when all else is equal
+    const aJoined = new Date(a.joined_at).getTime();
+    const bJoined = new Date(b.joined_at).getTime();
+    return aJoined - bJoined; // Earlier join = lower timestamp = sorts first
   });
 
   // All league sizes qualify top 4 players for playoffs

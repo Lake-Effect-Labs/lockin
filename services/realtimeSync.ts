@@ -162,6 +162,9 @@ function handleAppStateChange(
 
 /**
  * Subscribe to real-time score updates from other players
+ * 
+ * BUG FIX #6: Implements reconnection logic when subscription drops.
+ * Monitors subscription status and automatically reconnects on failure.
  */
 function subscribeToScoreUpdates(userId: string): void {
   // Subscribe to weekly_scores table changes
@@ -197,7 +200,24 @@ function subscribeToScoreUpdates(userId: string): void {
         }
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      // BUG FIX #6: Handle subscription status changes
+      if (status === 'SUBSCRIBED') {
+        console.log('[RealtimeSync] Successfully subscribed to score updates');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.error('[RealtimeSync] Subscription error:', err);
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+          console.log('[RealtimeSync] Attempting to reconnect...');
+          if (state.realtimeSubscription) {
+            supabase.removeChannel(state.realtimeSubscription);
+          }
+          subscribeToScoreUpdates(userId);
+        }, 5000); // Retry after 5 seconds
+      } else if (status === 'CLOSED') {
+        console.log('[RealtimeSync] Subscription closed');
+      }
+    });
 }
 
 // ============================================
@@ -206,6 +226,9 @@ function subscribeToScoreUpdates(userId: string): void {
 
 /**
  * Perform a sync now (with debouncing)
+ * 
+ * BUG FIX #5: Checks for revoked HealthKit permissions before syncing.
+ * If permissions are revoked, notifies listeners so UI can show a banner.
  */
 export async function syncNow(
   userId: string, 
@@ -228,6 +251,25 @@ export async function syncNow(
   state.lastSyncTime = now;
   
   try {
+    // BUG FIX #5: Check if HealthKit permissions have been revoked
+    if (!useFakeData && isHealthAvailable()) {
+      const { areHealthPermissionsRevoked } = await import('./health');
+      const { revoked, missingPermissions } = await areHealthPermissionsRevoked();
+      
+      if (revoked) {
+        console.warn('[RealtimeSync] HealthKit permissions revoked:', missingPermissions);
+        // Notify listeners about permission issue
+        notifyListeners({
+          type: 'local',
+          userId,
+          weeklyTotals: { steps: 0, sleepHours: 0, calories: 0, workouts: 0, distance: 0 },
+          weeklyPoints: 0,
+          timestamp: new Date().toISOString(),
+        });
+        return null;
+      }
+    }
+    
     // Syncing health data
     
     // Get health data

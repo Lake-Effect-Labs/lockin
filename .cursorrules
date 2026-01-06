@@ -1,0 +1,39 @@
+# Cursor Agent Rules for Lock-In Project
+
+## CRITICAL: Documentation File Policy
+
+**DO NOT create markdown (.md) files unless explicitly requested by the user.**
+
+### Rules:
+1. **NEVER create markdown files for:**
+   - Implementation summaries
+   - Fix documentation
+   - Debugging notes
+   - Progress reports
+   - Checklists (unless user explicitly asks)
+   - Analysis documents
+   - Any temporary or intermediate documentation
+
+2. **ONLY create markdown files when:**
+   - The user explicitly requests a markdown file
+   - Creating/updating README.md (which should stay in root)
+   - User asks for documentation to be written to a file
+
+3. **Instead of creating markdown files:**
+   - Provide summaries and explanations directly in your responses
+   - Use code comments for implementation details
+   - Update existing documentation files only when necessary
+   - All markdown files should go in the `docs/` folder if they must be created
+
+4. **If you must create documentation:**
+   - Place it in the `docs/` folder
+   - Keep it concise and essential
+   - Prefer inline code comments over separate documentation files
+
+### Project Structure:
+- All markdown files (except README.md) belong in `docs/` folder
+- README.md stays in project root
+- Avoid creating temporary or intermediate documentation files
+
+Remember: Code speaks louder than documentation. Focus on writing clean, well-commented code rather than creating separate documentation files.
+

@@ -294,6 +294,9 @@ export async function getDailyMetrics(date: Date = new Date()): Promise<DailyHea
 /**
  * Check health permissions status
  * Uses HealthKit's authorizationStatusFor to check actual permission state
+ * 
+ * BUG FIX #5: Returns detailed permission status including 'notDetermined' state.
+ * This allows the UI to show appropriate prompts when permissions are revoked.
  */
 export async function checkHealthPermissions(): Promise<HealthPermissions> {
   if (!isHealthAvailable()) {
@@ -323,6 +326,45 @@ export async function checkHealthPermissions(): Promise<HealthPermissions> {
       workouts: false,
       distance: false,
     };
+  }
+}
+
+/**
+ * BUG FIX #5: Check if HealthKit permissions have been revoked
+ * Returns true if any required permission is denied/revoked
+ * Should be called on every sync to detect permission changes
+ */
+export async function areHealthPermissionsRevoked(): Promise<{
+  revoked: boolean;
+  missingPermissions: string[];
+}> {
+  if (!isHealthAvailable()) {
+    return { revoked: true, missingPermissions: ['HealthKit not available'] };
+  }
+  
+  try {
+    const permissions = await checkHealthPermissions();
+    const missingPermissions: string[] = [];
+    
+    // Check each permission - at minimum we need steps OR calories to be useful
+    if (!permissions.steps) missingPermissions.push('Steps');
+    if (!permissions.calories) missingPermissions.push('Active Calories');
+    if (!permissions.sleep) missingPermissions.push('Sleep');
+    if (!permissions.workouts) missingPermissions.push('Workouts');
+    if (!permissions.distance) missingPermissions.push('Distance');
+    
+    // Consider revoked if we lost ALL permissions (user explicitly revoked)
+    // Having at least one permission means partial data is still possible
+    const allRevoked = !permissions.steps && !permissions.calories && 
+                       !permissions.sleep && !permissions.workouts && !permissions.distance;
+    
+    return {
+      revoked: allRevoked,
+      missingPermissions,
+    };
+  } catch (error: any) {
+    console.error('[Health] Permission revocation check error:', error?.message);
+    return { revoked: true, missingPermissions: ['Error checking permissions'] };
   }
 }
 
