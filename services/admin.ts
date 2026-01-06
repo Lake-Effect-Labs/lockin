@@ -45,36 +45,41 @@ export async function startLeague(leagueId: string, adminUserId: string): Promis
   // Check if league already started
   const { data: league } = await supabase
     .from('leagues')
-    .select('start_date, max_players')
+    .select('start_date, max_players, scoring_config')
     .eq('id', leagueId)
     .single();
-  
+
   if (!league) throw new Error('League not found');
-  
+
   if (league.start_date) {
     throw new Error('League has already started');
   }
-  
+
   // Check member count
   const { count } = await supabase
     .from('league_members')
     .select('*', { count: 'exact', head: true })
     .eq('league_id', leagueId);
-  
+
   if (count && count < 2) {
     throw new Error('League needs at least 2 players to start');
   }
-  
+
   // Start the league on next Monday (leagues start on Mondays)
   const { getNextMonday } = require('../utils/dates');
   const nextMonday = getNextMonday();
   const startDate = nextMonday.toISOString().split('T')[0];
-  
+
+  // Set start_date AND snapshot scoring_config to freeze it for the season
+  // (Moved from SQL trigger: snapshot_scoring_config_on_start)
   const { error: updateError } = await supabase
     .from('leagues')
-    .update({ start_date: startDate })
+    .update({
+      start_date: startDate,
+      season_scoring_config: league.scoring_config // Freeze scoring config at season start
+    })
     .eq('id', leagueId);
-  
+
   if (updateError) throw updateError;
   
   // Generate matchups for week 1

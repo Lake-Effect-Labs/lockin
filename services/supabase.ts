@@ -533,10 +533,15 @@ export async function joinLeagueByCode(joinCode: string, userId: string): Promis
     const { getNextMonday } = await import('../utils/dates');
     const nextMonday = getNextMonday();
     const startDate = nextMonday.toISOString().split('T')[0];
-    
+
+    // Set start_date AND snapshot scoring_config to freeze it for the season
+    // (Moved from SQL trigger: snapshot_scoring_config_on_start)
     await supabase
       .from('leagues')
-      .update({ start_date: startDate })
+      .update({
+        start_date: startDate,
+        season_scoring_config: league.scoring_config // Freeze scoring config at season start
+      })
       .eq('id', league.id);
     
     // Track analytics event
