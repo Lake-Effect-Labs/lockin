@@ -317,7 +317,6 @@ async function syncToAllLeagues(userId: string, metrics: FitnessMetrics): Promis
           sleep_hours: weekMetrics.sleepHours,
           calories: weekMetrics.calories,
           workouts: weekMetrics.workouts,
-          standHours: weekMetrics.standHours || 0,
           distance: weekMetrics.distance,
         }
       );
