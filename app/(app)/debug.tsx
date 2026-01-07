@@ -29,7 +29,7 @@ import {
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
-import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport, getRawHealthDebug } from '@/services/health';
+import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport, getRawHealthDebug, getTimezoneDebug } from '@/services/health';
 import {
   runFullRegressionSuite,
   RegressionTestResults,
@@ -72,6 +72,8 @@ export default function DebugScreen() {
   const { fakeMode, setFakeMode } = useHealthStore();
   const [rawHealthDebug, setRawHealthDebug] = useState<any>(null);
   const [isLoadingRawDebug, setIsLoadingRawDebug] = useState(false);
+  const [timezoneDebug, setTimezoneDebug] = useState<any>(null);
+  const [isLoadingTimezoneDebug, setIsLoadingTimezoneDebug] = useState(false);
   
   const runTests = () => {
     setIsRunning(true);
@@ -804,6 +806,110 @@ export default function DebugScreen() {
                 style={[styles.secondaryButton, { marginTop: 12 }]}
               >
                 <Text style={styles.secondaryText}>Clear Debug Output</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Timezone Debug Button */}
+          <TouchableOpacity
+            onPress={async () => {
+              setIsLoadingTimezoneDebug(true);
+              try {
+                const debug = await getTimezoneDebug();
+                setTimezoneDebug(debug);
+              } catch (error: any) {
+                Alert.alert('❌ Error', `Timezone debug failed: ${error.message}`);
+              } finally {
+                setIsLoadingTimezoneDebug(false);
+              }
+            }}
+            disabled={isLoadingTimezoneDebug}
+            style={[styles.secondaryButton, { borderColor: colors.primary[500], borderWidth: 2, marginTop: 12 }]}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time" size={20} color={colors.primary[500]} />
+            <Text style={[styles.secondaryText, { color: colors.primary[500] }]}>
+              {isLoadingTimezoneDebug ? '⏳ Loading...' : '🕐 TIMEZONE DEBUG (Verify Fix)'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Timezone Debug Display */}
+          {timezoneDebug && (
+            <View style={[styles.rawDebugContainer, { borderColor: colors.primary[500] }]}>
+              <Text style={[styles.rawDebugTitle, { color: colors.primary[500] }]}>🕐 TIMEZONE DEBUG</Text>
+
+              <View style={styles.rawDebugMetric}>
+                <Text style={styles.rawDebugMetricName}>📍 CURRENT TIME</Text>
+                <Text style={styles.rawDebugText}>Local: {timezoneDebug.currentTime.local}</Text>
+                <Text style={styles.rawDebugText}>ISO: {timezoneDebug.currentTime.iso}</Text>
+                <Text style={styles.rawDebugText}>Timezone: {timezoneDebug.currentTime.timezone}</Text>
+                <Text style={styles.rawDebugText}>UTC Offset: {timezoneDebug.currentTime.utcOffset >= 0 ? '+' : ''}{timezoneDebug.currentTime.utcOffset}h</Text>
+              </View>
+
+              <View style={styles.rawDebugMetric}>
+                <Text style={styles.rawDebugMetricName}>📊 DASHBOARD QUERY BOUNDARIES</Text>
+                <Text style={styles.rawDebugText}>From: {timezoneDebug.dashboardQueryBoundaries.fromLocal}</Text>
+                <Text style={styles.rawDebugSample}>ISO: {timezoneDebug.dashboardQueryBoundaries.from}</Text>
+                <Text style={styles.rawDebugText}>To: {timezoneDebug.dashboardQueryBoundaries.toLocal}</Text>
+                <Text style={styles.rawDebugSample}>ISO: {timezoneDebug.dashboardQueryBoundaries.to}</Text>
+              </View>
+
+              <View style={styles.rawDebugMetric}>
+                <Text style={styles.rawDebugMetricName}>🔍 RAW DEBUG QUERY BOUNDARIES</Text>
+                <Text style={styles.rawDebugText}>From: {timezoneDebug.rawDebugQueryBoundaries.fromLocal}</Text>
+                <Text style={styles.rawDebugSample}>ISO: {timezoneDebug.rawDebugQueryBoundaries.from}</Text>
+                <Text style={styles.rawDebugText}>To: {timezoneDebug.rawDebugQueryBoundaries.toLocal}</Text>
+                <Text style={styles.rawDebugSample}>ISO: {timezoneDebug.rawDebugQueryBoundaries.to}</Text>
+              </View>
+
+              <View style={[styles.rawDebugMetric, {
+                backgroundColor: timezoneDebug.comparison.boundariesMatch ? colors.status.success + '20' : colors.status.error + '20',
+                borderRadius: 8,
+                padding: 8,
+              }]}>
+                <Text style={[styles.rawDebugMetricName, {
+                  color: timezoneDebug.comparison.boundariesMatch ? colors.status.success : colors.status.error
+                }]}>
+                  {timezoneDebug.comparison.boundariesMatch ? '✅ BOUNDARIES MATCH!' : '❌ BOUNDARIES MISMATCH!'}
+                </Text>
+                {timezoneDebug.comparison.issue && (
+                  <Text style={[styles.rawDebugText, { color: colors.status.error }]}>
+                    {timezoneDebug.comparison.issue}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.rawDebugMetric}>
+                <Text style={[styles.rawDebugMetricName, {
+                  color: timezoneDebug.dashboardStepsResult.error ? colors.status.error :
+                         timezoneDebug.dashboardStepsResult.total > 0 ? colors.status.success : colors.status.warning
+                }]}>
+                  {timezoneDebug.dashboardStepsResult.error ? '❌' :
+                   timezoneDebug.dashboardStepsResult.total > 0 ? '✅' : '⚠️'} DASHBOARD STEPS RESULT
+                </Text>
+                {timezoneDebug.dashboardStepsResult.error ? (
+                  <Text style={[styles.rawDebugText, { color: colors.status.error }]}>
+                    Error: {timezoneDebug.dashboardStepsResult.error}
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={styles.rawDebugText}>Samples: {timezoneDebug.dashboardStepsResult.sampleCount}</Text>
+                    <Text style={[styles.rawDebugText, { fontSize: 18, fontWeight: '700' }]}>
+                      Total: {timezoneDebug.dashboardStepsResult.total.toLocaleString()} steps
+                    </Text>
+                  </>
+                )}
+              </View>
+
+              <Text style={[styles.rawDebugText, { marginTop: 12, fontStyle: 'italic', textAlign: 'center' }]}>
+                If BOUNDARIES MATCH and STEPS RESULT matches RAW DEBUG above, the fix is working!
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => setTimezoneDebug(null)}
+                style={[styles.secondaryButton, { marginTop: 12 }]}
+              >
+                <Text style={styles.secondaryText}>Clear Timezone Debug</Text>
               </TouchableOpacity>
             </View>
           )}

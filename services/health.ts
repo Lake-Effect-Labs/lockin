@@ -112,15 +112,6 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
     const from = getLocalStartOfDay(date);
     const to = getLocalEndOfDay(date);
 
-    // Debug log to verify timezone fix
-    console.log('[Health] getDailySteps query:', {
-      dateInput: date.toISOString(),
-      from: from.toISOString(),
-      to: to.toISOString(),
-      localFrom: from.toLocaleString(),
-      localTo: to.toLocaleString(),
-    });
-
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
       limit: 10000,
       filter: { date: { startDate: from, endDate: to } },
@@ -128,7 +119,6 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     if (samples && Array.isArray(samples)) {
       const total = samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0);
-      console.log('[Health] getDailySteps result:', { sampleCount: samples.length, total: Math.round(total) });
       return Math.round(total);
     }
     return 0;
@@ -813,5 +803,109 @@ export async function getRawHealthDebug(): Promise<{
   return {
     timestamp: now.toISOString(),
     queries,
+  };
+}
+
+/**
+ * Get TIMEZONE DEBUG info to verify the fix is working
+ * Shows what query boundaries the dashboard is using vs raw debug
+ */
+export async function getTimezoneDebug(): Promise<{
+  currentTime: {
+    iso: string;
+    local: string;
+    timezone: string;
+    utcOffset: number;
+  };
+  dashboardQueryBoundaries: {
+    from: string;
+    fromLocal: string;
+    to: string;
+    toLocal: string;
+  };
+  rawDebugQueryBoundaries: {
+    from: string;
+    fromLocal: string;
+    to: string;
+    toLocal: string;
+  };
+  comparison: {
+    boundariesMatch: boolean;
+    issue: string | null;
+  };
+  dashboardStepsResult: {
+    sampleCount: number;
+    total: number;
+    error: string | null;
+  };
+}> {
+  const now = new Date();
+
+  // Dashboard query boundaries (using the fixed LOCAL timezone functions)
+  const dashboardFrom = getLocalStartOfDay(now);
+  const dashboardTo = getLocalEndOfDay(now);
+
+  // Raw debug query boundaries (what getRawHealthDebug uses)
+  const rawFrom = new Date(now);
+  rawFrom.setHours(0, 0, 0, 0);
+  const rawTo = new Date(now);
+  rawTo.setHours(23, 59, 59, 999);
+
+  // Check if they match
+  const boundariesMatch =
+    dashboardFrom.getTime() === rawFrom.getTime() &&
+    dashboardTo.getTime() === rawTo.getTime();
+
+  // Get dashboard steps result
+  let dashboardStepsResult = { sampleCount: 0, total: 0, error: null as string | null };
+
+  if (isHealthAvailable()) {
+    try {
+      const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
+        limit: 10000,
+        filter: { date: { startDate: dashboardFrom, endDate: dashboardTo } },
+      });
+
+      if (samples && Array.isArray(samples)) {
+        const total = samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0);
+        dashboardStepsResult = {
+          sampleCount: samples.length,
+          total: Math.round(total),
+          error: null,
+        };
+      }
+    } catch (e: any) {
+      dashboardStepsResult.error = e.message;
+    }
+  } else {
+    dashboardStepsResult.error = 'HealthKit not available';
+  }
+
+  return {
+    currentTime: {
+      iso: now.toISOString(),
+      local: now.toLocaleString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      utcOffset: -now.getTimezoneOffset() / 60,
+    },
+    dashboardQueryBoundaries: {
+      from: dashboardFrom.toISOString(),
+      fromLocal: dashboardFrom.toLocaleString(),
+      to: dashboardTo.toISOString(),
+      toLocal: dashboardTo.toLocaleString(),
+    },
+    rawDebugQueryBoundaries: {
+      from: rawFrom.toISOString(),
+      fromLocal: rawFrom.toLocaleString(),
+      to: rawTo.toISOString(),
+      toLocal: rawTo.toLocaleString(),
+    },
+    comparison: {
+      boundariesMatch,
+      issue: boundariesMatch
+        ? null
+        : 'MISMATCH! Dashboard and raw debug are using different time boundaries',
+    },
+    dashboardStepsResult,
   };
 }
