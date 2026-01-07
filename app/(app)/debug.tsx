@@ -69,7 +69,7 @@ export default function DebugScreen() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationSteps, setSimulationSteps] = useState<SimulationStep[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const { fakeMode, setFakeMode } = useHealthStore();
+  const { fakeMode, setFakeMode, todayData, weekData, lastSyncedAt, syncWeekData, isLoading: healthLoading, error: healthError } = useHealthStore();
   const [rawHealthDebug, setRawHealthDebug] = useState<any>(null);
   const [isLoadingRawDebug, setIsLoadingRawDebug] = useState(false);
   const [timezoneDebug, setTimezoneDebug] = useState<any>(null);
@@ -913,6 +913,69 @@ export default function DebugScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Store State Debug - Always visible */}
+          <View style={[styles.rawDebugContainer, { borderColor: colors.status.warning, marginTop: 12 }]}>
+            <Text style={[styles.rawDebugTitle, { color: colors.status.warning }]}>📦 HEALTH STORE STATE</Text>
+
+            <View style={styles.rawDebugMetric}>
+              <Text style={styles.rawDebugMetricName}>🔄 SYNC STATUS</Text>
+              <Text style={styles.rawDebugText}>Loading: {healthLoading ? 'YES' : 'NO'}</Text>
+              <Text style={styles.rawDebugText}>Last Synced: {lastSyncedAt || 'Never'}</Text>
+              {healthError && <Text style={[styles.rawDebugText, { color: colors.status.error }]}>Error: {healthError}</Text>}
+            </View>
+
+            <View style={styles.rawDebugMetric}>
+              <Text style={[styles.rawDebugMetricName, {
+                color: todayData && todayData.steps > 0 ? colors.status.success : colors.status.error
+              }]}>
+                {todayData && todayData.steps > 0 ? '✅' : '❌'} TODAY DATA (what home screen shows)
+              </Text>
+              {todayData ? (
+                <>
+                  <Text style={styles.rawDebugText}>Date: {todayData.date}</Text>
+                  <Text style={[styles.rawDebugText, { fontSize: 16, fontWeight: '700' }]}>Steps: {todayData.steps}</Text>
+                  <Text style={styles.rawDebugText}>Sleep: {todayData.sleepHours}h</Text>
+                  <Text style={styles.rawDebugText}>Calories: {todayData.calories}</Text>
+                  <Text style={styles.rawDebugText}>Workouts: {todayData.workouts}m</Text>
+                  <Text style={styles.rawDebugText}>Distance: {todayData.distance?.toFixed(2)} mi</Text>
+                </>
+              ) : (
+                <Text style={[styles.rawDebugText, { color: colors.status.error }]}>todayData is NULL!</Text>
+              )}
+            </View>
+
+            <View style={styles.rawDebugMetric}>
+              <Text style={styles.rawDebugMetricName}>📅 WEEK DATA ({weekData?.length || 0} days)</Text>
+              {weekData && weekData.length > 0 ? (
+                weekData.map((day, i) => (
+                  <Text key={i} style={styles.rawDebugText}>
+                    {day.date}: {day.steps} steps, {day.sleepHours}h sleep, {day.calories} cal
+                  </Text>
+                ))
+              ) : (
+                <Text style={[styles.rawDebugText, { color: colors.status.error }]}>weekData is empty!</Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert('Syncing...', 'Manually triggering syncWeekData()');
+                try {
+                  const result = await syncWeekData();
+                  Alert.alert('Sync Complete', `Got ${result?.length || 0} days of data. Check store state above.`);
+                } catch (e: any) {
+                  Alert.alert('Sync Error', e.message);
+                }
+              }}
+              style={[styles.secondaryButton, { marginTop: 12, borderColor: colors.status.warning }]}
+            >
+              <Ionicons name="refresh" size={20} color={colors.status.warning} />
+              <Text style={[styles.secondaryText, { color: colors.status.warning }]}>
+                Force Sync Now
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Health Test Results */}
           {healthResults && (
