@@ -29,7 +29,7 @@ import {
   getHealthDiagnostics,
   HealthTestSuite,
 } from '@/services/healthTest';
-import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport, getRawHealthDebug, getTimezoneDebug } from '@/services/health';
+import { getHealthDiagnostics as getHealthKitDiagnostics, initializeHealth, getHealthDiagnosticReport, getRawHealthDebug, getTimezoneDebug, debugWeekDataFlow } from '@/services/health';
 import {
   runFullRegressionSuite,
   RegressionTestResults,
@@ -74,6 +74,8 @@ export default function DebugScreen() {
   const [isLoadingRawDebug, setIsLoadingRawDebug] = useState(false);
   const [timezoneDebug, setTimezoneDebug] = useState<any>(null);
   const [isLoadingTimezoneDebug, setIsLoadingTimezoneDebug] = useState(false);
+  const [weekFlowDebug, setWeekFlowDebug] = useState<any>(null);
+  const [isLoadingWeekFlow, setIsLoadingWeekFlow] = useState(false);
   
   const runTests = () => {
     setIsRunning(true);
@@ -975,6 +977,73 @@ export default function DebugScreen() {
                 Force Sync Now
               </Text>
             </TouchableOpacity>
+
+            {/* Week Data Flow Debug Button */}
+            <TouchableOpacity
+              onPress={async () => {
+                setIsLoadingWeekFlow(true);
+                try {
+                  const debug = await debugWeekDataFlow();
+                  setWeekFlowDebug(debug);
+                } catch (error: any) {
+                  Alert.alert('❌ Error', `Week flow debug failed: ${error.message}`);
+                } finally {
+                  setIsLoadingWeekFlow(false);
+                }
+              }}
+              disabled={isLoadingWeekFlow}
+              style={[styles.secondaryButton, { marginTop: 12, borderColor: colors.status.error, borderWidth: 2 }]}
+            >
+              <Ionicons name="bug" size={20} color={colors.status.error} />
+              <Text style={[styles.secondaryText, { color: colors.status.error }]}>
+                {isLoadingWeekFlow ? '⏳ Loading...' : '🐛 DEBUG WEEK FLOW (Find Error)'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Week Flow Debug Display */}
+            {weekFlowDebug && (
+              <View style={[styles.rawDebugMetric, { marginTop: 12, backgroundColor: colors.status.error + '10', borderRadius: 8, padding: 12 }]}>
+                <Text style={[styles.rawDebugMetricName, { color: colors.status.error }]}>🐛 WEEK DATA FLOW DEBUG</Text>
+                <Text style={styles.rawDebugText}>isHealthAvailable: {weekFlowDebug.isHealthAvailable ? '✅ YES' : '❌ NO'}</Text>
+                <Text style={styles.rawDebugText}>Today: {weekFlowDebug.today}</Text>
+                <Text style={styles.rawDebugText}>Day of Week: {weekFlowDebug.dayOfWeek} (0=Sun)</Text>
+                <Text style={styles.rawDebugText}>Days from Monday: {weekFlowDebug.daysFromMonday}</Text>
+                <Text style={styles.rawDebugText}>Monday: {weekFlowDebug.monday}</Text>
+
+                <Text style={[styles.rawDebugMetricName, { marginTop: 12 }]}>📅 EACH DAY RESULT:</Text>
+                {weekFlowDebug.days.map((day: any, i: number) => (
+                  <View key={i} style={{
+                    backgroundColor: day.success ? colors.status.success + '20' : colors.status.error + '20',
+                    borderRadius: 4,
+                    padding: 8,
+                    marginTop: 8,
+                  }}>
+                    <Text style={[styles.rawDebugText, { fontWeight: '700' }]}>
+                      Day {day.index}: {day.success ? '✅ SUCCESS' : '❌ FAILED'}
+                    </Text>
+                    <Text style={styles.rawDebugSample}>Date: {day.dateLocal}</Text>
+                    {day.success && day.data ? (
+                      <>
+                        <Text style={styles.rawDebugText}>Steps: {day.data.steps}</Text>
+                        <Text style={styles.rawDebugText}>Sleep: {day.data.sleepHours}h</Text>
+                        <Text style={styles.rawDebugText}>Calories: {day.data.calories}</Text>
+                      </>
+                    ) : (
+                      <Text style={[styles.rawDebugText, { color: colors.status.error, fontWeight: '700' }]}>
+                        ERROR: {day.error}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  onPress={() => setWeekFlowDebug(null)}
+                  style={[styles.secondaryButton, { marginTop: 12 }]}
+                >
+                  <Text style={styles.secondaryText}>Clear Debug</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Health Test Results */}

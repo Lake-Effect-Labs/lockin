@@ -427,7 +427,9 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
     try {
       const dayData = await getDailyMetrics(date);
       weekData.push(dayData);
-    } catch (error) {
+    } catch (error: any) {
+      // Log the error so we can debug
+      console.error(`[Health] getCurrentWeekHealthData error for day ${i}:`, error?.message);
       weekData.push({
         date: date.toISOString().split('T')[0],
         steps: 0,
@@ -440,6 +442,67 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
   }
 
   return weekData;
+}
+
+/**
+ * DEBUG: Trace the exact flow of getCurrentWeekHealthData to find errors
+ */
+export async function debugWeekDataFlow(): Promise<{
+  today: string;
+  dayOfWeek: number;
+  daysFromMonday: number;
+  monday: string;
+  days: {
+    index: number;
+    dateInput: string;
+    dateLocal: string;
+    success: boolean;
+    data: DailyHealthData | null;
+    error: string | null;
+  }[];
+  isHealthAvailable: boolean;
+}> {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const monday = new Date(today);
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  monday.setDate(today.getDate() - daysFromMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const days: any[] = [];
+
+  for (let i = 0; i <= daysFromMonday; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+
+    let result: any = {
+      index: i,
+      dateInput: date.toISOString(),
+      dateLocal: date.toLocaleString(),
+      success: false,
+      data: null,
+      error: null,
+    };
+
+    try {
+      const dayData = await getDailyMetrics(date);
+      result.success = true;
+      result.data = dayData;
+    } catch (error: any) {
+      result.error = error?.message || 'Unknown error';
+    }
+
+    days.push(result);
+  }
+
+  return {
+    today: today.toISOString(),
+    dayOfWeek,
+    daysFromMonday,
+    monday: monday.toISOString(),
+    days,
+    isHealthAvailable: isHealthAvailable(),
+  };
 }
 
 /**
