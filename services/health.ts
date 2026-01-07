@@ -32,19 +32,26 @@ export interface DailyHealthData extends FitnessMetrics {
 const isExpoGo = Constants?.executionEnvironment === 'storeClient';
 
 /**
- * Get UTC start of day for a date
- * Ensures consistent day boundaries across all timezones
+ * Get LOCAL start of day for a date
+ * Uses local timezone to match how users think about "today"
+ *
+ * CRITICAL FIX: Previously used UTC which caused a timezone offset bug.
+ * For EST (UTC-5) users at 11 PM, UTC queries would miss all data after 7 PM local.
  */
-function getUTCStartOfDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+function getLocalStartOfDay(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
 }
 
 /**
- * Get UTC end of day for a date
- * Ensures consistent day boundaries across all timezones
+ * Get LOCAL end of day for a date
+ * Uses local timezone to match how users think about "today"
  */
-function getUTCEndOfDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+function getLocalEndOfDay(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(23, 59, 59, 999);
+  return result;
 }
 
 /**
@@ -101,9 +108,18 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
   }
 
   try {
-    // Use UTC boundaries for consistent day calculation across timezones
-    const from = getUTCStartOfDay(date);
-    const to = getUTCEndOfDay(date);
+    // Use LOCAL timezone boundaries to match user's concept of "today"
+    const from = getLocalStartOfDay(date);
+    const to = getLocalEndOfDay(date);
+
+    // Debug log to verify timezone fix
+    console.log('[Health] getDailySteps query:', {
+      dateInput: date.toISOString(),
+      from: from.toISOString(),
+      to: to.toISOString(),
+      localFrom: from.toLocaleString(),
+      localTo: to.toLocaleString(),
+    });
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
       limit: 10000,
@@ -112,6 +128,7 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
     if (samples && Array.isArray(samples)) {
       const total = samples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0);
+      console.log('[Health] getDailySteps result:', { sampleCount: samples.length, total: Math.round(total) });
       return Math.round(total);
     }
     return 0;
@@ -131,11 +148,12 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
 
   try {
     // Look at sleep from the night before (18:00 previous day to end of current day)
-    // Use UTC for consistency across timezones
+    // Use LOCAL timezone to match user's concept of sleep patterns
     const previousDay = new Date(date);
-    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
-    const from = new Date(Date.UTC(previousDay.getUTCFullYear(), previousDay.getUTCMonth(), previousDay.getUTCDate(), 18, 0, 0, 0));
-    const to = getUTCEndOfDay(date);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const from = new Date(previousDay);
+    from.setHours(18, 0, 0, 0);
+    const to = getLocalEndOfDay(date);
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
       limit: 10000,
@@ -170,9 +188,9 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
   }
 
   try {
-    // Use UTC boundaries for consistent day calculation across timezones
-    const from = getUTCStartOfDay(date);
-    const to = getUTCEndOfDay(date);
+    // Use LOCAL timezone boundaries to match user's concept of "today"
+    const from = getLocalStartOfDay(date);
+    const to = getLocalEndOfDay(date);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
       unit: 'kilocalorie',
@@ -200,9 +218,9 @@ export async function getDailyDistance(date: Date = new Date()): Promise<number>
   }
 
   try {
-    // Use UTC boundaries for consistent day calculation across timezones
-    const from = getUTCStartOfDay(date);
-    const to = getUTCEndOfDay(date);
+    // Use LOCAL timezone boundaries to match user's concept of "today"
+    const from = getLocalStartOfDay(date);
+    const to = getLocalEndOfDay(date);
 
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', {
       limit: 10000,
@@ -229,9 +247,9 @@ export async function getDailyWorkouts(date: Date = new Date()): Promise<number>
   }
 
   try {
-    // Use UTC boundaries for consistent day calculation across timezones
-    const from = getUTCStartOfDay(date);
-    const to = getUTCEndOfDay(date);
+    // Use LOCAL timezone boundaries to match user's concept of "today"
+    const from = getLocalStartOfDay(date);
+    const to = getLocalEndOfDay(date);
 
     const samples = await queryWorkoutSamples({
       limit: 10000,
