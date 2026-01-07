@@ -409,6 +409,10 @@ export async function getDailyHealthData(date: Date = new Date()): Promise<Daily
 
 /**
  * Get health data for the current week (Monday to today)
+ *
+ * CRITICAL FIX: Query HealthKit directly instead of through getDailyMetrics()
+ * The intermediate functions were failing silently, causing all 0s.
+ * This mirrors the approach in getRawHealthDebug() which works correctly.
  */
 export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
   const today = new Date();
@@ -420,16 +424,12 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
 
   const weekData: DailyHealthData[] = [];
 
-  for (let i = 0; i <= daysFromMonday; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-
-    try {
-      const dayData = await getDailyMetrics(date);
-      weekData.push(dayData);
-    } catch (error: any) {
-      // Log the error so we can debug
-      console.error(`[Health] getCurrentWeekHealthData error for day ${i}:`, error?.message);
+  // Check if HealthKit is available once at the start
+  if (!isHealthAvailable()) {
+    console.log('[Health] getCurrentWeekHealthData: HealthKit not available, returning empty data');
+    for (let i = 0; i <= daysFromMonday; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
       weekData.push({
         date: date.toISOString().split('T')[0],
         steps: 0,
@@ -439,6 +439,120 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
         workouts: 0,
       });
     }
+    return weekData;
+  }
+
+  for (let i = 0; i <= daysFromMonday; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+
+    // Use LOCAL time boundaries (same as getRawHealthDebug which works)
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
+
+    // Sleep needs to look at previous day 6pm to end of current day
+    const sleepFrom = new Date(date);
+    sleepFrom.setDate(sleepFrom.getDate() - 1);
+    sleepFrom.setHours(18, 0, 0, 0);
+
+    let steps = 0;
+    let sleepHours = 0;
+    let calories = 0;
+    let distance = 0;
+    let workouts = 0;
+
+    // Query each metric directly (like getRawHealthDebug does)
+    try {
+      const stepSamples = await queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
+        limit: 10000,
+        filter: { date: { startDate: from, endDate: to } },
+      });
+      if (stepSamples && Array.isArray(stepSamples)) {
+        steps = Math.round(stepSamples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0));
+      }
+    } catch (e: any) {
+      console.error(`[Health] Steps query failed for day ${i}:`, e?.message);
+    }
+
+    try {
+      const calSamples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
+        unit: 'kilocalorie',
+        limit: 10000,
+        filter: { date: { startDate: from, endDate: to } },
+      });
+      if (calSamples && Array.isArray(calSamples)) {
+        calories = Math.round(calSamples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0));
+      }
+    } catch (e: any) {
+      console.error(`[Health] Calories query failed for day ${i}:`, e?.message);
+    }
+
+    try {
+      const distSamples = await queryQuantitySamples('HKQuantityTypeIdentifierDistanceWalkingRunning', {
+        limit: 10000,
+        filter: { date: { startDate: from, endDate: to } },
+      });
+      if (distSamples && Array.isArray(distSamples)) {
+        const meters = distSamples.reduce((sum: number, s: any) => sum + (s?.quantity ?? 0), 0);
+        distance = meters / 1609.34; // Convert to miles
+      }
+    } catch (e: any) {
+      console.error(`[Health] Distance query failed for day ${i}:`, e?.message);
+    }
+
+    try {
+      const sleepSamples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
+        limit: 10000,
+        filter: { date: { startDate: sleepFrom, endDate: to } },
+      });
+      if (sleepSamples && Array.isArray(sleepSamples)) {
+        let totalMinutes = 0;
+        sleepSamples.forEach((s: any) => {
+          // Skip "inBed" samples (value 0), only count actual sleep
+          if (s?.value !== 0) {
+            const start = new Date(s.startDate).getTime();
+            const end = new Date(s.endDate).getTime();
+            totalMinutes += (end - start) / (1000 * 60);
+          }
+        });
+        sleepHours = totalMinutes / 60;
+      }
+    } catch (e: any) {
+      console.error(`[Health] Sleep query failed for day ${i}:`, e?.message);
+    }
+
+    try {
+      const workoutSamples = await queryWorkoutSamples({
+        limit: 10000,
+        filter: { date: { startDate: from, endDate: to } },
+      });
+      if (workoutSamples && Array.isArray(workoutSamples)) {
+        let totalMinutes = 0;
+        workoutSamples.forEach((s: any) => {
+          if (s?.startDate && s?.endDate) {
+            const start = new Date(s.startDate).getTime();
+            const end = new Date(s.endDate).getTime();
+            if (!isNaN(start) && !isNaN(end) && end > start) {
+              totalMinutes += (end - start) / (1000 * 60);
+            }
+          }
+        });
+        workouts = Math.round(totalMinutes);
+      }
+    } catch (e: any) {
+      console.error(`[Health] Workouts query failed for day ${i}:`, e?.message);
+    }
+
+    weekData.push({
+      date: date.toISOString().split('T')[0],
+      steps,
+      sleepHours,
+      calories,
+      distance,
+      workouts,
+    });
   }
 
   return weekData;
