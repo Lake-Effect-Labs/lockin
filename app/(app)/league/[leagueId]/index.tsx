@@ -69,6 +69,9 @@ export default function LeagueDashboardScreen() {
   
   useEffect(() => {
     if (leagueId && user) {
+      // BUG FIX: Sync data when dashboard loads to ensure scores are up-to-date
+      refresh().catch(err => console.log('Sync on dashboard load failed:', err));
+      
       fetchDashboard(leagueId, user.id);
       
       // Check and process week end when dashboard loads

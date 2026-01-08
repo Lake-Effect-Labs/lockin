@@ -27,12 +27,18 @@ export default function MatchupScreen() {
   const { leagueId } = useLocalSearchParams<{ leagueId: string }>();
   const { user } = useAuthStore();
   const { currentDashboard, fetchDashboard } = useLeagueStore();
+  const { refresh } = useRealtimeSync();
   
   useEffect(() => {
-    if (leagueId && user && !currentDashboard) {
-      fetchDashboard(leagueId, user.id);
+    if (leagueId && user) {
+      // BUG FIX: Sync data when matchup screen loads to ensure scores are up-to-date
+      refresh().catch(err => console.log('Sync on matchup load failed:', err));
+      
+      if (!currentDashboard) {
+        fetchDashboard(leagueId, user.id);
+      }
     }
-  }, [leagueId, user]);
+  }, [leagueId, user, refresh]);
   
   if (!currentDashboard || !currentDashboard.currentMatchup) {
     return (

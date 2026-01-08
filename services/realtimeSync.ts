@@ -350,21 +350,37 @@ async function syncToAllLeagues(userId: string, metrics: FitnessMetrics): Promis
         }
       }
       
-      await upsertWeeklyScore(
-        league.id,
-        userId,
-        fullLeague.current_week,
-        {
+      // BUG FIX: Add error logging and ensure sync happens
+      try {
+        console.log(`[RealtimeSync] Syncing to league ${league.id}, week ${fullLeague.current_week}:`, {
           steps: weekMetrics.steps,
           sleep_hours: weekMetrics.sleepHours,
           calories: weekMetrics.calories,
           workouts: weekMetrics.workouts,
           distance: weekMetrics.distance,
-        }
-      );
+        });
+        
+        await upsertWeeklyScore(
+          league.id,
+          userId,
+          fullLeague.current_week,
+          {
+            steps: weekMetrics.steps,
+            sleep_hours: weekMetrics.sleepHours,
+            calories: weekMetrics.calories,
+            workouts: weekMetrics.workouts,
+            distance: weekMetrics.distance,
+          }
+        );
+        
+        console.log(`[RealtimeSync] ✅ Successfully synced to league ${league.id}`);
+      } catch (syncError: any) {
+        console.error(`[RealtimeSync] ❌ Failed to sync to league ${league.id}:`, syncError?.message || syncError);
+        // Continue with other leagues
+      }
     }
-  } catch (error) {
-    // Error syncing to leagues
+  } catch (error: any) {
+    console.error('[RealtimeSync] Error syncing to leagues:', error?.message || error);
     // Don't throw - we want to continue syncing to other leagues
   }
 }

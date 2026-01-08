@@ -171,6 +171,9 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
 
 /**
  * Get active calories for a date
+ * 
+ * BUG FIX: Removed invalid 'kilocalorie' unit parameter.
+ * The @kingstinct/react-native-healthkit library auto-detects the unit.
  */
 export async function getDailyCalories(date: Date = new Date()): Promise<number> {
   if (!isHealthAvailable()) {
@@ -178,12 +181,12 @@ export async function getDailyCalories(date: Date = new Date()): Promise<number>
   }
 
   try {
-    // Use LOCAL timezone boundaries to match user's concept of "today"
-    const from = getLocalStartOfDay(date);
-    const to = getLocalEndOfDay(date);
+    // Use UTC boundaries for consistency (matching other metrics)
+    const from = getUTCStartOfDay(date);
+    const to = getUTCEndOfDay(date);
 
+    // BUG FIX: Remove unit parameter - library auto-detects kilocalories
     const samples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
-      unit: 'kilocalorie',
       limit: 10000,
       filter: { date: { startDate: from, endDate: to } },
     });
@@ -477,8 +480,8 @@ export async function getCurrentWeekHealthData(): Promise<DailyHealthData[]> {
     }
 
     try {
+      // BUG FIX: Remove unit parameter - library auto-detects kilocalories
       const calSamples = await queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
-        unit: 'kilocalorie',
         limit: 10000,
         filter: { date: { startDate: from, endDate: to } },
       });
