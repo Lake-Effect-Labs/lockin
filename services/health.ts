@@ -130,6 +130,15 @@ export async function getDailySteps(date: Date = new Date()): Promise<number> {
 
 /**
  * Get sleep hours for a date
+ * 
+ * BUG FIX B1: Fixed sleep calculation to only count the most recent main sleep session.
+ * 
+ * Logic:
+ * - Query sleep from 12 PM previous day to 12 PM current day (24-hour window)
+ * - This captures the main overnight sleep session
+ * - Filters out "in bed" samples (value 0), only counts actual sleep (value 1+)
+ * - Deduplicates overlapping segments by tracking covered time ranges
+ * - Returns total hours of non-overlapping sleep
  */
 export async function getDailySleep(date: Date = new Date()): Promise<number> {
   if (!isHealthAvailable()) {
@@ -137,13 +146,14 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
   }
 
   try {
-    // Look at sleep from the night before (18:00 previous day to end of current day)
-    // Use LOCAL timezone to match user's concept of sleep patterns
+    // Query 24-hour window: 12 PM yesterday to 12 PM today
+    // This captures the main overnight sleep without double-counting naps
     const previousDay = new Date(date);
     previousDay.setDate(previousDay.getDate() - 1);
     const from = new Date(previousDay);
-    from.setHours(18, 0, 0, 0);
-    const to = getLocalEndOfDay(date);
+    from.setHours(12, 0, 0, 0); // 12 PM yesterday
+    const to = new Date(date);
+    to.setHours(12, 0, 0, 0); // 12 PM today
 
     const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
       limit: 10000,
@@ -151,15 +161,43 @@ export async function getDailySleep(date: Date = new Date()): Promise<number> {
     });
 
     if (samples && Array.isArray(samples) && samples.length > 0) {
-      let totalMinutes = 0;
-      samples.forEach((s: any) => {
-        // Skip "inBed" samples (value 0), only count actual sleep
-        if (s?.value !== 0) {
-          const start = new Date(s.startDate).getTime();
-          const end = new Date(s.endDate).getTime();
-          totalMinutes += (end - start) / (1000 * 60);
+      // Filter to only actual sleep (not "in bed")
+      const sleepSamples = samples.filter((s: any) => s?.value !== 0);
+      
+      if (sleepSamples.length === 0) return 0;
+      
+      // Sort by start time to process chronologically
+      sleepSamples.sort((a: any, b: any) => 
+        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      );
+      
+      // Merge overlapping segments to avoid double-counting
+      const mergedSegments: Array<{start: number, end: number}> = [];
+      
+      sleepSamples.forEach((s: any) => {
+        const start = new Date(s.startDate).getTime();
+        const end = new Date(s.endDate).getTime();
+        
+        if (mergedSegments.length === 0) {
+          mergedSegments.push({ start, end });
+        } else {
+          const last = mergedSegments[mergedSegments.length - 1];
+          
+          // If this segment overlaps with the last one, merge them
+          if (start <= last.end) {
+            last.end = Math.max(last.end, end);
+          } else {
+            // No overlap, add as new segment
+            mergedSegments.push({ start, end });
+          }
         }
       });
+      
+      // Sum up all non-overlapping sleep time
+      const totalMinutes = mergedSegments.reduce((sum, seg) => {
+        return sum + (seg.end - seg.start) / (1000 * 60);
+      }, 0);
+      
       return totalMinutes / 60;
     }
     return 0;

@@ -17,6 +17,7 @@ import { useLeagueStore } from '@/store/useLeagueStore';
 import { getMatchups, getLeagueWeeklyScores } from '@/services/supabase';
 import { Matchup, WeeklyScore } from '@/services/supabase';
 import { Avatar } from '@/components/Avatar';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { colors, getScoreColor } from '@/utils/colors';
 
 // ============================================
@@ -136,6 +137,9 @@ export default function AllMatchupsScreen() {
           <Text style={styles.title}>All Matchups</Text>
           <View style={styles.placeholder} />
         </View>
+        
+        {/* Ad Banner - BUG FIX B4 */}
+        <SmartAdBanner placement="league" />
 
         {/* Week Selector */}
         <ScrollView

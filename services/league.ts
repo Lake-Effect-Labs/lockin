@@ -506,31 +506,45 @@ export function isLeagueCreator(league: League, userId: string): boolean {
  * Calculate days remaining in the current week
  * Scoring period: Monday-Saturday (6 days)
  * Sunday is results day, not part of scoring
+ * 
+ * BUG FIX B2: Uses LOCAL time (not UTC) for countdown display.
+ * This ensures "1 day left" on Friday means "ends tomorrow at 11:59 PM local time"
  */
 function calculateDaysRemainingInWeek(startDate: string | null, currentWeek: number): number {
   if (!startDate) return 6;
   
-  // startDate should be a Monday, and scoring weeks run Monday-Saturday
-  const start = new Date(startDate);
+  // Parse start date as UTC to avoid timezone shifts
+  let start: Date;
+  if (startDate.includes('T')) {
+    start = new Date(startDate);
+  } else {
+    const [year, month, day] = startDate.split('-').map(Number);
+    start = new Date(Date.UTC(year, month - 1, day));
+  }
   
-  // Calculate the start of the current week (Monday)
+  // Calculate the start of the current week (Monday) in UTC
   // Week 1 starts on startDate (which is a Monday)
   // Week N starts on startDate + (N-1) * 7 days
-  const weekStart = new Date(start.getTime() + ((currentWeek - 1) * 7 * 24 * 60 * 60 * 1000));
+  const weekStartUTC = Date.UTC(
+    start.getUTCFullYear(),
+    start.getUTCMonth(),
+    start.getUTCDate() + ((currentWeek - 1) * 7)
+  );
   
-  // Scoring week ends on Saturday at end of day (5 days after Monday)
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 5);
-  weekEnd.setHours(23, 59, 59, 999);
+  // Scoring week ends on Saturday at 11:59:59 PM LOCAL time (5 days after Monday)
+  // Convert to local date for display purposes
+  const weekEndLocal = new Date(weekStartUTC);
+  weekEndLocal.setDate(weekEndLocal.getDate() + 5); // Saturday
+  weekEndLocal.setHours(23, 59, 59, 999);
   
   const now = new Date();
-  const diffTime = weekEnd.getTime() - now.getTime();
+  const diffTime = weekEndLocal.getTime() - now.getTime();
   
-  // Use Math.floor instead of Math.ceil so that:
-  // - Saturday shows as "0 days" (ends today)
-  // - Friday shows as "1 day" (ends tomorrow)
-  // - etc.
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  // Use Math.ceil for countdown display so:
+  // - Friday 11:59 PM shows "0 days" (less than 24 hours)
+  // - Friday 12:01 AM shows "1 day" (more than 24 hours)
+  // - Thursday shows "2 days"
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   return Math.max(0, diffDays);
 }

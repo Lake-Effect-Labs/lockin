@@ -27,6 +27,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
 import { BracketView, CompactBracket } from '@/components/BracketView';
 import { Avatar } from '@/components/Avatar';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { SeasonTimeline } from '@/components/WeekProgressBar';
 import { colors } from '@/utils/colors';
 import { buildPlayoffBracket, isUserChampion, getCurrentPlayoffRound, getPlayoffStatusText } from '@/services/playoffs';
@@ -150,6 +151,9 @@ export default function PlayoffsScreen() {
           <Text style={styles.title}>Playoffs</Text>
           <View style={styles.placeholder} />
         </View>
+        
+        {/* Ad Banner - BUG FIX B4 */}
+        <SmartAdBanner placement="league" />
         
         {/* Status */}
         <View style={styles.statusCard}>

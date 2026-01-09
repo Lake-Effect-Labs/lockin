@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
 import { PlayerScoreCard, PlayoffSeedCard } from '@/components/PlayerScoreCard';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { colors } from '@/utils/colors';
 
 // ============================================
@@ -66,6 +67,9 @@ export default function StandingsScreen() {
           <Text style={styles.title}>Standings</Text>
           <View style={styles.placeholder} />
         </View>
+        
+        {/* Ad Banner - BUG FIX B4 */}
+        <SmartAdBanner placement="standings" />
         
         {/* Season Info */}
         <View style={styles.seasonInfo}>

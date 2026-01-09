@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLeagueStore } from '@/store/useLeagueStore';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { MatchupCard } from '@/components/MatchupCard';
 import { PointsBreakdown } from '@/components/StatBubble';
 import { Avatar } from '@/components/Avatar';
@@ -52,13 +53,44 @@ export default function MatchupScreen() {
   
   const { currentMatchup, userScore, opponentScore, league, daysRemaining, isResultsDay } = currentDashboard;
   
+  // BUG FIX B3: Add null checks to prevent crashes when data is missing
+  if (!currentMatchup || !league || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading matchup data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
   const isPlayer1 = currentMatchup.player1_id === user?.id;
   const opponent = isPlayer1 ? currentMatchup.player2 : currentMatchup.player1;
   
-  // Use league-specific scoring config
-  const leagueScoringConfig = league.scoring_config 
-    ? getScoringConfig(league.scoring_config)
-    : undefined;
+  // BUG FIX B3: Handle missing opponent data gracefully
+  if (!opponent) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Opponent data not available</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  // Use league-specific scoring config with error handling
+  let leagueScoringConfig: ReturnType<typeof getScoringConfig> | undefined;
+  try {
+    if (league.scoring_config) {
+      const config = typeof league.scoring_config === 'string' 
+        ? JSON.parse(league.scoring_config as string) 
+        : league.scoring_config;
+      leagueScoringConfig = getScoringConfig(config);
+    }
+  } catch (error) {
+    console.error('Error parsing scoring config:', error);
+    leagueScoringConfig = undefined;
+  }
   
   const myBreakdown = userScore ? getPointsBreakdown({
     steps: userScore.steps || 0,

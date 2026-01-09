@@ -19,6 +19,7 @@ import { useHealthStore } from '@/store/useHealthStore';
 import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { Avatar } from '@/components/Avatar';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { colors } from '@/utils/colors';
 import { initializeHealth, isHealthAvailable } from '@/services/health';
 

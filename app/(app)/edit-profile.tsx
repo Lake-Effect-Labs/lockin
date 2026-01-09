@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Avatar } from '@/components/Avatar';
+import { SmartAdBanner } from '@/components/AdBanner';
 import { colors } from '@/utils/colors';
 
 // ============================================
@@ -113,6 +114,9 @@ export default function EditProfileScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        {/* Ad Banner - BUG FIX B4 */}
+        <SmartAdBanner placement="home" />
+        
         {/* Avatar Preview */}
         <View style={styles.avatarSection}>
           <Avatar
